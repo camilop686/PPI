@@ -19,7 +19,7 @@ Esta documentación define el **Mapa de Sitio (Sitemap)**, el **Mapa de Usuario 
 
 ```mermaid
 graph TD
-    A[Inicio / Home] --> B[Catálogo / Sección de Virus]
+    A[Inicio - Home] --> B[Catálogo - Sección de Virus]
     A --> C[Guía General de Prevención]
     A --> D[Portal de Usuario]
     A --> E[Panel de Administración]
@@ -40,24 +40,24 @@ graph TD
 
     flowchart TD
     Inicio([Inicio]) --> Cat[Navegar Catálogo de Virus]
-    Cat --> Sel[Seleccionar Virus / Información]
+    Cat --> Sel[Seleccionar Virus e Información]
     Sel --> Vis[Visualizar Métodos de Prevención]
-    Vis --> Preg1{¿Desea agregar un comentario/método?}
+    Vis --> Preg1{Desea agregar un comentario o método}
     
     Preg1 -- No --> Fin([Fin de Navegación])
-    Preg1 -- Sí --> Preg2{¿Inició Sesión?}
+    Preg1 -- Sí --> Preg2{Inició Sesión}
     
-    Preg2 -- No --> Auth[Login / Registro]
+    Preg2 -- No --> Auth[Login o Registro]
     Auth --> Form[Formulario de Comentario]
     Preg2 -- Sí --> Form
     
-    Form --> Env[Enviar Comentario / Aporte]
-    Env --> Pub([Comentario Publicado / En Moderación])
+    Form --> Env[Enviar Comentario o Aporte]
+    Env --> Pub([Comentario Publicado o En Moderación])
 
     flowchart TD
     Admin([Login Admin]) --> Dash[Dashboard Admin]
     
-    Dash --> Mod1[Gestión Info / Virus]
+    Dash --> Mod1[Gestión Info y Virus]
     Dash --> Mod2[Moderación Comentarios]
     Dash --> Mod3[Gestión de Cuentas]
     
@@ -97,7 +97,3 @@ DataTable / Tabla de Datos Genérica (CRUD): Tabla para consultar, editar o elim
 UserManagementCard / Gestión de Usuarios: Muestra datos del usuario (nombre, correo) con acciones para suspender o eliminar cuentas.
 
 ContentEditorModal / Modal Editor de Contenido: Formulario flotante para crear y editar datos.
-
-
-
-
