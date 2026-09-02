@@ -1,46 +1,22 @@
-import { useState } from 'react';
-import './App.css';
-import MetodosPrevencion from './components/MetodosPrevencion';
+import { useEffect, useMemo, useState } from 'react'
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+/* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+import { AlertCircle, BarChart3, BookOpen, LogOut, MessageSquare, ShieldCheck, Bug, Search, Settings } from 'lucide-react'
+import { supabase, isConfigured } from './lib/supabase'
+import './App.css'
 
-import Login from './components/Login';
-import MenuUsuario from './components/MenuUsuario';
-import MenuAdmin from './components/MenuAdmin';
-
-function App() {
-  const [tipoUsuario, setTipoUsuario] = useState(null);
-  const [pantalla, setPantalla] = useState('menu');
-
-  function manejarLogin(tipo) {
-    setTipoUsuario(tipo);
-  }
-
-  function cerrarSesion() {
-    setTipoUsuario(null);
-    setPantalla('menu');
-  }
-
-  if (tipoUsuario === 'usuario') {
-  if (pantalla === 'metodos') {
-    return (
-      <MetodosPrevencion
-        onVolver={() => setPantalla('menu')}
-      />
-    );
-  }
-
-  return (
-    <MenuUsuario
-      onCerrarSesion={cerrarSesion}
-      onMetodos={() => setPantalla('metodos')}
-    />
-  );
-}
-
-  if (tipoUsuario === 'admin') {
-    return <MenuAdmin onCerrarSesion={cerrarSesion} />;
-  }
-
-  return <Login onLogin={manejarLogin} />;
-}
-
-export default App;
+const nav = [['/inicio','Inicio',ShieldCheck],['/metodos','Métodos',BookOpen],['/amenazas','Amenazas',Bug],['/comunidad','Comunidad',MessageSquare],['/perfil','Perfil',Settings]]
+const clean = value => value.replace(/<[^>]*>/g, '').trim()
+const Loading=()=> <div className="center"><span className="spinner"/>Cargando plataforma segura…</div>
+const Notice=({children})=> <div className="notice"><AlertCircle size={18}/>{children}</div>
+function AuthProvider({children}) { const [session,setSession]=useState(undefined),[profile,setProfile]=useState(null); useEffect(()=>{if(!isConfigured)return setSession(null);supabase.auth.getSession().then(({data})=>setSession(data.session));const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));return()=>subscription.unsubscribe()},[]);useEffect(()=>{if(!session)return setProfile(null);supabase.from('profiles').select('*').eq('id',session.user.id).single().then(({data})=>setProfile(data))},[session]);return session===undefined?<Loading/>:children({session,profile}) }
+function Layout({children,profile}) {const go=useNavigate();const logout=async()=>{await supabase.auth.signOut();go('/acceso')};return <div className="shell"><aside><div className="brand"><ShieldCheck/> PPI <small>Prevención inteligente</small></div><nav>{nav.map(([to,label,I])=><NavLink key={to} to={to}><I size={18}/>{label}</NavLink>)}{profile?.role==='admin'&&<NavLink to="/admin"><BarChart3 size={18}/>Administración</NavLink>}</nav><button className="ghost" onClick={logout}><LogOut size={18}/>Cerrar sesión</button></aside><main>{children}</main></div>}
+function Protected({session,profile,admin,children}){if(!session)return <Navigate to="/acceso" replace/>;if(admin&&profile?.role!=='admin')return <Navigate to="/inicio" replace/>;return <Layout profile={profile}>{children}</Layout>}
+function Access({registerDefault=false}) {const [register,setRegister]=useState(registerDefault),[recovery,setRecovery]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState('');const go=useNavigate();const submit=async e=>{e.preventDefault();if(!isConfigured)return setMessage('Configura las variables de Supabase para activar el acceso.');const f=new FormData(e.currentTarget),email=String(f.get('email')).trim(),password=String(f.get('password'));setBusy(true);let error;if(recovery)({error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:`${location.origin}/perfil`}));else if(register)({error}=await supabase.auth.signUp({email,password,options:{data:{full_name:clean(String(f.get('name')))}}}));else({error}=await supabase.auth.signInWithPassword({email,password}));setBusy(false);setMessage(error?error.message:recovery?'Revisa tu correo para continuar.':register?'Cuenta creada. Confirma tu correo antes de iniciar sesión.':'');if(!error&&!register&&!recovery)go('/inicio')};return <div className="auth"><section><ShieldCheck size={42}/><h1>Protege tu vida digital.</h1><p>PPI reúne prácticas fiables, amenazas explicadas y una comunidad moderada.</p></section><form className="card" onSubmit={submit}><h2>{recovery?'Recuperar contraseña':register?'Crear cuenta':'Bienvenido de nuevo'}</h2>{message&&<Notice>{message}</Notice>}{register&&<label>Nombre completo<input name="name" required minLength="2" maxLength="60"/></label>}<label>Correo electrónico<input name="email" type="email" required/></label>{!recovery&&<label>Contraseña<input name="password" type="password" minLength="8" required/></label>}<button disabled={busy}>{busy?'Procesando…':recovery?'Enviar enlace':register?'Registrarme':'Iniciar sesión'}</button><button type="button" className="link" onClick={()=>{setRecovery(!recovery);setMessage('')}}>{recovery?'Volver al acceso':'¿Olvidaste tu contraseña?'}</button>{!recovery&&<button type="button" className="link" onClick={()=>{setRegister(!register);setMessage('')}}>{register?'Volver a iniciar sesión':'Crear una cuenta'}</button>}</form></div>}
+const Page=({title,children})=><><header className="pagehead"><div><p className="eyebrow">PPI · aprendizaje seguro</p><h1>{title}</h1></div></header>{children}</>
+function Home({profile}){return <Page title={`Hola, ${profile?.full_name||'persona protegida'}`}><div className="hero"><div><h2>La prevención empieza con decisiones informadas.</h2><p>Explora guías verificables para proteger tus dispositivos, datos y cuentas.</p></div><ShieldCheck size={76}/></div><section className="grid">{[['12+','métodos prácticos'],['8+','amenazas explicadas'],['24/7','hábitos de seguridad']].map(x=><article className="stat" key={x[1]}><strong>{x[0]}</strong><span>{x[1]}</span></article>)}</section></Page>}
+function Catalogue({table,title,kind}){const [items,setItems]=useState([]),[query,setQuery]=useState(''),[error,setError]=useState('');useEffect(()=>{supabase.from(table).select('*').order('created_at',{ascending:false}).then(({data,error})=>{setItems(data||[]);setError(error?.message||'')})},[table]);const filtered=useMemo(()=>items.filter(x=>JSON.stringify(x).toLowerCase().includes(query.toLowerCase())),[items,query]);return <Page title={title}><div className="toolbar"><Search size={18}/><input aria-label="Buscar" placeholder="Buscar en el catálogo…" value={query} onChange={e=>setQuery(e.target.value)}/></div>{error&&<Notice>{error}</Notice>}<div className="grid cards">{filtered.map(x=><article className="card" key={x.id}><span className="tag">{x.risk_level||x.category||kind}</span><h2>{x.name}</h2><p>{x.description||x.what_is}</p>{x.recommendations&&<><h3>Recomendación</h3><p>{x.recommendations}</p></>}{x.how_spreads&&<p><b>Propagación:</b> {x.how_spreads}</p>}</article>)}</div>{!error&&!items.length&&<div className="empty">Aún no hay contenido publicado.</div>}</Page>}
+function Community({session}){const [comments,setComments]=useState([]),[body,setBody]=useState(''),[notice,setNotice]=useState('');const load=()=>supabase.from('comments').select('id, body, created_at, profiles(full_name)').eq('status','approved').order('created_at',{ascending:false}).then(({data})=>setComments(data||[]));useEffect(load,[]);const post=async e=>{e.preventDefault();const safe=clean(body);if(!safe)return setNotice('Escribe una recomendación antes de publicarla.');const {error}=await supabase.from('comments').insert({body:safe,user_id:session.user.id});setNotice(error?error.message:'Tu aporte fue enviado a moderación.');setBody('')};return <Page title="Comunidad"><form className="card composer" onSubmit={post}><h2>Comparte una recomendación</h2><textarea value={body} onChange={e=>setBody(e.target.value)} maxLength="1000" placeholder="¿Conoces otra forma de prevenir amenazas?"/><button>Enviar a moderación</button>{notice&&<p>{notice}</p>}</form><div className="feed">{comments.map(c=><article className="comment" key={c.id}><b>{c.profiles?.full_name||'Miembro PPI'}</b><time>{new Date(c.created_at).toLocaleDateString('es-CO')}</time><p>{c.body}</p></article>)}</div></Page>}
+function Profile({session,profile}){const [name,setName]=useState(profile?.full_name||''),[msg,setMsg]=useState('');const save=async e=>{e.preventDefault();const {error}=await supabase.from('profiles').update({full_name:clean(name)}).eq('id',session.user.id);setMsg(error?error.message:'Perfil actualizado correctamente.')};return <Page title="Mi perfil"><form className="card form" onSubmit={save}><label>Nombre<input value={name} onChange={e=>setName(e.target.value)} required maxLength="60"/></label><label>Correo<input value={session.user.email} disabled/></label><button>Guardar cambios</button>{msg&&<p>{msg}</p>}</form></Page>}
+function Admin(){const [metrics,setMetrics]=useState({profiles:0,prevention_methods:0,threats:0,comments:0});useEffect(()=>{Object.keys(metrics).forEach(table=>supabase.from(table).select('*',{count:'exact',head:true}).then(({count})=>setMetrics(x=>({...x,[table]:count||0}))))},[]);return <Page title="Administración"><div className="grid">{Object.entries(metrics).map(([k,v])=><article className="stat" key={k}><strong>{v}</strong><span>{k.replace('_',' ')}</span></article>)}</div><section className="card"><h2>Operaciones protegidas</h2><p>Gestiona contenido, usuarios y moderación desde Supabase. Las políticas RLS impiden acciones administrativas de cuentas normales.</p></section></Page>}
+export default function App(){return <BrowserRouter><AuthProvider>{({session,profile})=><Routes><Route path="/acceso" element={<Access/>}/><Route path="/registro" element={<Access registerDefault/>}/><Route path="/inicio" element={<Protected session={session} profile={profile}><Home profile={profile}/></Protected>}/><Route path="/metodos" element={<Protected session={session} profile={profile}><Catalogue table="prevention_methods" title="Métodos de prevención" kind="Método"/></Protected>}/><Route path="/amenazas" element={<Protected session={session} profile={profile}><Catalogue table="threats" title="Amenazas informáticas" kind="Amenaza"/></Protected>}/><Route path="/comunidad" element={<Protected session={session} profile={profile}><Community session={session}/></Protected>}/><Route path="/perfil" element={<Protected session={session} profile={profile}><Profile session={session} profile={profile}/></Protected>}/><Route path="/admin" element={<Protected session={session} profile={profile} admin><Admin/></Protected>}/><Route path="*" element={<Navigate to={session?'/inicio':'/acceso'}/>}/></Routes>}</AuthProvider></BrowserRouter>}

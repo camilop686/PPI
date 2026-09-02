@@ -1,16 +1,18 @@
-# React + Vite
+# PPI · Prevención de Virus
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Plataforma educativa React + Vite para aprender métodos fiables de prevención de amenazas informáticas. Incluye autenticación Supabase, catálogo filtrable, comunidad moderada y rutas protegidas por rol.
 
-Currently, two official plugins are available:
+## Inicio
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Crea un proyecto en Supabase y, en **SQL Editor**, ejecuta [`supabase/schema.sql`](supabase/schema.sql).
+2. Copia `.env.example` como `.env` y completa `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` (la clave pública anon).
+3. Registra una cuenta y promociónala a administradora con la sentencia final del esquema.
+4. Instala dependencias con `pnpm install`, inicia con `pnpm dev` y valida con `pnpm build`.
 
-## React Compiler
+## Seguridad
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Las credenciales no se incluyen en el repositorio. Row Level Security limita perfiles a su propietario, contenido de administración a administradores y comentarios a su autor o moderación. No uses una `service_role` en el frontend.
 
-## Expanding the ESLint configuration
+## Arquitectura
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+`src/App.jsx` contiene las rutas y vistas; `src/lib/supabase.js` inicializa el cliente; `supabase/schema.sql` define tablas, disparador de perfil, RLS y datos iniciales educativos.
