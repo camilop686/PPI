@@ -380,7 +380,9 @@ function Community({ session }) {
     }
     setLoading(false);
   };
-  useEffect(loadPosts, [session.user.id]);
+  useEffect(() => {
+    loadPosts();
+  }, [session.user.id]);
   useEffect(() => {
     if (!selected) return setReplies([]);
     supabase
@@ -927,7 +929,9 @@ function Moderation({ table = "comments", label = "comentarios" }) {
       setError(error?.message || "");
     });
   };
-  useEffect(load, [table]);
+  useEffect(() => {
+    load();
+  }, [table]);
   const act = async (id, status) => {
     const { error: actError } = await supabase
       .from(table)
