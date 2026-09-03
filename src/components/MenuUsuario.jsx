@@ -1,3 +1,4 @@
+// Menú de usuario heredado; se conserva para compatibilidad con la versión anterior.
 function MenuUsuario({ onCerrarSesion, onMetodos }) {
     return (
         <div className="menu-container">

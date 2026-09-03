@@ -1,5 +1,6 @@
 -- Ejecutar una vez después de schema.sql. Permite a administradores cambiar roles
 -- sin exponer la service_role al navegador.
+-- La función valida al administrador, protege su propio rol y actualiza el perfil destino.
 create or replace function public.admin_set_role(target_id uuid, next_role public.user_role)
 returns void language plpgsql security definer set search_path=public as $$
 begin

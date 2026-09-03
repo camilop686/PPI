@@ -1,7 +1,9 @@
+/* Normaliza el tamaño de todos los elementos para que los estilos sean predecibles. */
 * {
   box-sizing: border-box;
 }
 
+/* Define la base visual usada por las vistas heredadas y la aplicación actual. */
 body {
   margin: 0;
   font-family: Arial, sans-serif;

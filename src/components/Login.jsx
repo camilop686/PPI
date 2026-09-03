@@ -1,13 +1,15 @@
+// Componente heredado para la primera maqueta de acceso con usuarios de prueba.
 import { useState } from 'react';
 
 function Login({ onLogin }) {
+  // Conserva los valores escritos en el formulario local.
   const [correo, setCorreo] = useState('');
   const [contraseña, setContraseña] = useState('');
 
   function manejarIngreso(e) {
     e.preventDefault();
 
-    // Usuarios de prueba
+    // Usuarios de prueba conservados para compatibilidad con la maqueta anterior.
     if (correo === 'usuario@gmail.com' && contraseña === '1234') {
       onLogin('usuario');
       return;

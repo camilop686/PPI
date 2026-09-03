@@ -1,3 +1,4 @@
+// Catálogo estático heredado; el catálogo activo se obtiene desde Supabase.
 function MetodosPrevencion({ onVolver }) {
   return (
     <div className="prevencion-container">

@@ -1,15 +1,25 @@
 -- Ejecutar en Supabase SQL Editor. Nunca expongas la service_role en el cliente.
+-- La extensión genera identificadores UUID para registros creados desde la aplicación.
 create extension if not exists pgcrypto;
+-- Los enums limitan los roles y estados a valores conocidos por el frontend.
 create type public.user_role as enum ('user','admin');
 create type public.comment_status as enum ('pending','approved','rejected');
+-- Perfil vinculado a Auth; el rol se conserva fuera del control del usuario final.
 create table public.profiles (id uuid primary key references auth.users on delete cascade, full_name text not null check (char_length(full_name) between 2 and 60), avatar_url text, role public.user_role not null default 'user', created_at timestamptz not null default now());
+-- Catálogo administrable de métodos de prevención.
 create table public.prevention_methods (id uuid primary key default gen_random_uuid(), name text not null unique, description text not null, risk_level text not null, recommendations text not null, examples text not null, what_to_do text not null, published boolean not null default true, created_at timestamptz not null default now());
+-- Catálogo administrable de amenazas informáticas.
 create table public.threats (id uuid primary key default gen_random_uuid(), name text not null unique, category text not null, what_is text not null, how_spreads text not null, prevention text not null, published boolean not null default true, created_at timestamptz not null default now());
+-- Comentarios moderados: nunca se publican directamente al crear.
 create table public.comments (id uuid primary key default gen_random_uuid(), user_id uuid not null references public.profiles on delete cascade, body text not null check (char_length(trim(body)) between 1 and 1000 and body !~ '<[^>]+>'), status public.comment_status not null default 'pending', created_at timestamptz not null default now());
+-- RLS obliga a que las reglas de acceso se cumplan también fuera del frontend.
 alter table public.profiles enable row level security; alter table public.prevention_methods enable row level security; alter table public.threats enable row level security; alter table public.comments enable row level security;
+-- Función reutilizable para comprobar el rol administrativo sin exponer datos sensibles.
 create function public.is_admin() returns boolean language sql stable security definer set search_path=public as $$select exists(select 1 from profiles where id=auth.uid() and role='admin')$$;
+-- Crea automáticamente un perfil cuando Supabase Auth registra una cuenta.
 create function public.handle_new_user() returns trigger language plpgsql security definer set search_path=public as $$begin insert into public.profiles(id,full_name) values(new.id,coalesce(nullif(new.raw_user_meta_data->>'full_name',''),split_part(new.email,'@',1))); return new; end$$;
 create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.handle_new_user();
+-- Estas políticas separan lectura pública autenticada, propiedad y moderación.
 create policy "read public profiles" on profiles for select to authenticated using (true); create policy "own profile update" on profiles for update to authenticated using (id=auth.uid()) with check (id=auth.uid() and role=(select role from profiles where id=auth.uid()));
 create policy "read published methods" on prevention_methods for select to authenticated using (published or is_admin()); create policy "admins manage methods" on prevention_methods for all to authenticated using (is_admin()) with check (is_admin());
 create policy "read published threats" on threats for select to authenticated using (published or is_admin()); create policy "admins manage threats" on threats for all to authenticated using (is_admin()) with check (is_admin());

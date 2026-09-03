@@ -1,3 +1,4 @@
+// Menú administrativo heredado; el panel conectado actual vive en App.jsx.
 function MenuAdmin({ onCerrarSesion }) {
   return (
     <div className="admin-container">
