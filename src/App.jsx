@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BrowserRouter,
   NavLink,
@@ -30,6 +30,9 @@ const nav = [
   ["/comunidad", "Comunidad", MessageSquare],
   ["/perfil", "Perfil", Settings],
 ];
+const POST_CATEGORIES = ["General", "Prevención", "Amenazas", "Ayuda técnica"];
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const clean = (value) => value.replace(/<[^>]*>/g, "").trim();
 const Loading = () => (
   <div className="center">
@@ -43,39 +46,86 @@ const Notice = ({ children }) => (
     {children}
   </div>
 );
+const formatDate = (value) =>
+  new Date(value).toLocaleDateString("es-CO", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+const getPreviewUrl = (file) => URL.createObjectURL(file);
+
 function AuthProvider({ children }) {
-  const [session, setSession] = useState(undefined),
-    [profile, setProfile] = useState(undefined);
-  useEffect(() => {
-    if (!isConfigured) return setSession(null);
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
-    return () => subscription.unsubscribe();
-  }, []);
-  useEffect(() => {
-    if (!session) return setProfile(null);
+  const [session, setSession] = useState(undefined);
+  const [profile, setProfile] = useState(undefined);
+
+  const refreshProfile = useCallback(async (userId) => {
+    if (!userId) {
+      setProfile(null);
+      return;
+    }
+
     setProfile(undefined);
-    supabase
+    const { data } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", session.user.id)
-      .single()
-      .then(({ data }) => setProfile(data || null));
-  }, [session]);
+      .eq("id", userId)
+      .maybeSingle();
+
+    setProfile(data || null);
+  }, []);
+
+  useEffect(() => {
+    if (!isConfigured) {
+      setSession(null);
+      return;
+    }
+
+    let active = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) {
+        setSession(data.session);
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (active) {
+        setSession(nextSession);
+      }
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setProfile(null);
+      return;
+    }
+
+    refreshProfile(session.user.id);
+  }, [refreshProfile, session?.user?.id]);
+
   return session === undefined || (session && profile === undefined) ? (
     <Loading />
   ) : (
-    children({ session, profile })
+    children({ session, profile, refreshProfile })
   );
 }
+
 function Layout({ children, profile }) {
   const go = useNavigate();
+
   const logout = async () => {
     await supabase.auth.signOut();
     go("/acceso");
   };
+
   return (
     <div className="shell">
       <aside>
@@ -86,9 +136,9 @@ function Layout({ children, profile }) {
           </span>
         </div>
         <nav>
-          {nav.map(([to, label, I]) => (
+          {nav.map(([to, label, Icon]) => (
             <NavLink key={to} to={to}>
-              <I size={18} />
+              <Icon size={18} />
               {label}
             </NavLink>
           ))}
@@ -108,41 +158,65 @@ function Layout({ children, profile }) {
     </div>
   );
 }
+
 function Protected({ session, profile, admin, children }) {
   if (!session) return <Navigate to="/acceso" replace />;
-  if (admin && profile?.role !== "admin")
+  if (admin && profile?.role !== "admin") {
     return <Navigate to="/inicio" replace />;
+  }
+
   return <Layout profile={profile}>{children}</Layout>;
 }
+
 function Access({ registerDefault = false }) {
-  const [register, setRegister] = useState(registerDefault),
-    [recovery, setRecovery] = useState(false),
-    [busy, setBusy] = useState(false),
-    [message, setMessage] = useState("");
+  const [register, setRegister] = useState(registerDefault);
+  const [recovery, setRecovery] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
   const go = useNavigate();
+
+  useEffect(() => {
+    setRegister(registerDefault);
+    setRecovery(false);
+    setMessage("");
+  }, [registerDefault]);
+
   const submit = async (e) => {
     e.preventDefault();
-    if (!isConfigured)
-      return setMessage(
-        "Configura las variables de Supabase para activar el acceso.",
-      );
-    const f = new FormData(e.currentTarget),
-      email = String(f.get("email")).trim(),
-      password = String(f.get("password"));
+
+    if (!isConfigured) {
+      setMessage("Configura las variables de Supabase para activar el acceso.");
+      return;
+    }
+
+    const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") || "").trim();
+    const password = String(form.get("password") || "");
+    const fullName = clean(String(form.get("name") || ""));
+
+    if (register && (fullName.length < 2 || fullName.length > 60)) {
+      setMessage("Ingresa un nombre válido entre 2 y 60 caracteres.");
+      return;
+    }
+
     setBusy(true);
+    setMessage("");
+
     let error;
-    if (recovery)
+    if (recovery) {
       ({ error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${location.origin}/perfil`,
+        redirectTo: `${window.location.origin}/perfil`,
       }));
-    else if (register)
+    } else if (register) {
       ({ error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: clean(String(f.get("name"))) } },
+        options: { data: { full_name: fullName } },
       }));
-    else
+    } else {
       ({ error } = await supabase.auth.signInWithPassword({ email, password }));
+    }
+
     setBusy(false);
     setMessage(
       error
@@ -153,8 +227,12 @@ function Access({ registerDefault = false }) {
             ? "Cuenta creada. Confirma tu correo antes de iniciar sesión."
             : "",
     );
-    if (!error && !register && !recovery) go("/inicio");
+
+    if (!error && !register && !recovery) {
+      go("/inicio");
+    }
   };
+
   return (
     <div className="auth">
       <section>
@@ -226,6 +304,7 @@ function Access({ registerDefault = false }) {
     </div>
   );
 }
+
 const Page = ({ title, children }) => (
   <>
     <header className="pagehead">
@@ -237,6 +316,7 @@ const Page = ({ title, children }) => (
     {children}
   </>
 );
+
 function Home({ profile }) {
   return (
     <Page title={`Hola, ${profile?.full_name || "persona protegida"}`}>
@@ -255,37 +335,41 @@ function Home({ profile }) {
           ["12+", "métodos prácticos"],
           ["8+", "amenazas explicadas"],
           ["24/7", "hábitos de seguridad"],
-        ].map((x) => (
-          <article className="stat" key={x[1]}>
-            <strong>{x[0]}</strong>
-            <span>{x[1]}</span>
+        ].map((item) => (
+          <article className="stat" key={item[1]}>
+            <strong>{item[0]}</strong>
+            <span>{item[1]}</span>
           </article>
         ))}
       </section>
     </Page>
   );
 }
+
 function Catalogue({ table, title, kind }) {
-  const [items, setItems] = useState([]),
-    [query, setQuery] = useState(""),
-    [error, setError] = useState("");
+  const [items, setItems] = useState([]);
+  const [query, setQuery] = useState("");
+  const [error, setError] = useState("");
+
   useEffect(() => {
     supabase
       .from(table)
       .select("*")
       .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
+      .then(({ data, error: loadError }) => {
         setItems(data || []);
-        setError(error?.message || "");
+        setError(loadError?.message || "");
       });
   }, [table]);
+
   const filtered = useMemo(
     () =>
-      items.filter((x) =>
-        JSON.stringify(x).toLowerCase().includes(query.toLowerCase()),
+      items.filter((item) =>
+        JSON.stringify(item).toLowerCase().includes(query.toLowerCase()),
       ),
     [items, query],
   );
+
   return (
     <Page title={title}>
       <div className="toolbar">
@@ -299,20 +383,20 @@ function Catalogue({ table, title, kind }) {
       </div>
       {error && <Notice>{error}</Notice>}
       <div className="grid cards">
-        {filtered.map((x) => (
-          <article className="card" key={x.id}>
-            <span className="tag">{x.risk_level || x.category || kind}</span>
-            <h2>{x.name}</h2>
-            <p>{x.description || x.what_is}</p>
-            {x.recommendations && (
+        {filtered.map((item) => (
+          <article className="card" key={item.id}>
+            <span className="tag">{item.risk_level || item.category || kind}</span>
+            <h2>{item.name}</h2>
+            <p>{item.description || item.what_is}</p>
+            {item.recommendations && (
               <>
                 <h3>Recomendación</h3>
-                <p>{x.recommendations}</p>
+                <p>{item.recommendations}</p>
               </>
             )}
-            {x.how_spreads && (
+            {item.how_spreads && (
               <p>
-                <b>Propagación:</b> {x.how_spreads}
+                <b>Propagación:</b> {item.how_spreads}
               </p>
             )}
           </article>
@@ -328,184 +412,330 @@ function Catalogue({ table, title, kind }) {
     </Page>
   );
 }
-const Avatar = ({ url, name = "U" }) => {
+
+const Avatar = ({ url, name = "U", className = "avatar" }) => {
   const initials = name
     .split(" ")
-    .map((n) => n[0])
+    .filter(Boolean)
+    .map((chunk) => chunk[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
   return url ? (
-    <img src={url} alt={name} className="avatar" />
+    <img src={url} alt={name} className={className} />
   ) : (
-    <div className="avatar-init">{initials}</div>
+    <div className={`${className} avatar-init`}>{initials || "U"}</div>
   );
 };
+
 function Community({ session }) {
-  const [posts, setPosts] = useState([]),
-    [replyCount, setReplyCount] = useState({}),
-    [selected, setSelected] = useState(null),
-    [title, setTitle] = useState(""),
-    [body, setBody] = useState(""),
-    [category, setCategory] = useState("General"),
-    [reply, setReply] = useState(""),
-    [replies, setReplies] = useState([]),
-    [notice, setNotice] = useState(""),
-    [search, setSearch] = useState(""),
-    [loading, setLoading] = useState(false),
-    [replying, setReplying] = useState(false),
-    [uploading, setUploading] = useState(false),
-    [image, setImage] = useState(null),
-    [previewUrl, setPreviewUrl] = useState("");
-  const loadPosts = async () => {
-    setLoading(true);
+  const [posts, setPosts] = useState([]);
+  const [replyCount, setReplyCount] = useState({});
+  const [selected, setSelected] = useState(null);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [category, setCategory] = useState("General");
+  const [reply, setReply] = useState("");
+  const [replies, setReplies] = useState([]);
+  const [notice, setNotice] = useState("");
+  const [search, setSearch] = useState("");
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [loadingReplies, setLoadingReplies] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [replying, setReplying] = useState(false);
+  const [uploadingPostImage, setUploadingPostImage] = useState(false);
+  const [uploadingReplyImage, setUploadingReplyImage] = useState(false);
+  const [postImage, setPostImage] = useState(null);
+  const [postPreviewUrl, setPostPreviewUrl] = useState("");
+  const [replyImage, setReplyImage] = useState(null);
+  const [replyPreviewUrl, setReplyPreviewUrl] = useState("");
+
+  const resetPostComposer = () => {
+    setTitle("");
+    setBody("");
+    setCategory("General");
+    setPostImage(null);
+    setPostPreviewUrl("");
+  };
+
+  const resetReplyComposer = () => {
+    setReply("");
+    setReplyImage(null);
+    setReplyPreviewUrl("");
+  };
+
+  useEffect(
+    () => () => {
+      if (postPreviewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(postPreviewUrl);
+      }
+    },
+    [postPreviewUrl],
+  );
+
+  useEffect(
+    () => () => {
+      if (replyPreviewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(replyPreviewUrl);
+      }
+    },
+    [replyPreviewUrl],
+  );
+
+  const handleImageSelect = (event, mode) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!IMAGE_TYPES.includes(file.type)) {
+      setNotice("Solo JPG, PNG o WebP");
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      setNotice("La imagen debe ser menor o igual a 5 MB");
+      return;
+    }
+
+    const preview = getPreviewUrl(file);
+    setNotice("");
+
+    if (mode === "reply") {
+      setReplyImage(file);
+      setReplyPreviewUrl(preview);
+      return;
+    }
+
+    setPostImage(file);
+    setPostPreviewUrl(preview);
+  };
+
+  const uploadImage = async (file, onUploadingChange) => {
+    if (!file) return null;
+
+    onUploadingChange(true);
+    const ext = file.name.split(".").pop();
+    const path = `${session.user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error } = await supabase.storage.from("forum-images").upload(path, file, {
+      upsert: false,
+    });
+
+    if (error) {
+      setNotice(`Error subiendo imagen: ${error.message}`);
+      onUploadingChange(false);
+      return null;
+    }
+
+    const { data } = supabase.storage.from("forum-images").getPublicUrl(path);
+    onUploadingChange(false);
+    return data.publicUrl;
+  };
+
+  const loadPosts = useCallback(async () => {
+    setLoadingPosts(true);
+
     const { data, error } = await supabase
       .from("forum_posts")
       .select("*,profiles(id,full_name,avatar_url)")
       .order("created_at", { ascending: false });
+
     if (error) {
-      setNotice(`Error cargando Comunidad: ${error.message}`);
+      setNotice(`Error cargando publicaciones: ${error.message}`);
       setPosts([]);
-    } else {
-      setPosts(data || []);
-      const counts = {};
-      for (const post of data || []) {
-        const { count } = await supabase
-          .from("forum_replies")
-          .select("*", { count: "exact", head: true })
-          .eq("post_id", post.id);
-        counts[post.id] = count || 0;
-      }
-      setReplyCount(counts);
+      setReplyCount({});
+      setLoadingPosts(false);
+      return;
     }
-    setLoading(false);
-  };
+
+    const nextPosts = data || [];
+    setPosts(nextPosts);
+
+    if (!nextPosts.length) {
+      setReplyCount({});
+      setLoadingPosts(false);
+      return;
+    }
+
+    const { data: repliesData, error: repliesError } = await supabase
+      .from("forum_replies")
+      .select("post_id")
+      .in(
+        "post_id",
+        nextPosts.map((post) => post.id),
+      );
+
+    if (repliesError) {
+      setNotice(`Error cargando publicaciones: ${repliesError.message}`);
+      setReplyCount({});
+      setLoadingPosts(false);
+      return;
+    }
+
+    const counts = (repliesData || []).reduce((acc, item) => {
+      acc[item.post_id] = (acc[item.post_id] || 0) + 1;
+      return acc;
+    }, {});
+
+    setReplyCount(counts);
+    setLoadingPosts(false);
+  }, [session.user.id]);
+
   useEffect(() => {
     loadPosts();
-  }, [session.user.id]);
+  }, [loadPosts]);
+
   useEffect(() => {
-    if (!selected) return setReplies([]);
+    let cancelled = false;
+
+    if (!selected) {
+      setReplies([]);
+      setLoadingReplies(false);
+      resetReplyComposer();
+      return;
+    }
+
+    setLoadingReplies(true);
+
     supabase
       .from("forum_replies")
-      .select("*,profiles(full_name,avatar_url)")
+      .select("*,profiles(id,full_name,avatar_url)")
       .eq("post_id", selected.id)
       .order("created_at")
-      .then(({ data }) => setReplies(data || []));
+      .then(({ data, error }) => {
+        if (cancelled) return;
+
+        if (error) {
+          setNotice(`Error cargando comentarios: ${error.message}`);
+          setReplies([]);
+        } else {
+          setReplies(data || []);
+        }
+
+        setLoadingReplies(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [selected]);
-  const handleImageSelect = (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(f.type)) {
-      setNotice("Solo JPG, PNG o WebP");
-      return;
-    }
-    if (f.size > 5242880) {
-      setNotice("Imagen debe ser menor a 5MB");
-      return;
-    }
-    setImage(f);
-    setPreviewUrl(URL.createObjectURL(f));
-  };
-  const uploadImage = async () => {
-    if (!image) return null;
-    setUploading(true);
-    const ext = image.name.split(".").pop();
-    const path = `${session.user.id}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage
-      .from("forum-images")
-      .upload(path, image);
-    if (error) {
-      setNotice("Error subiendo imagen");
-      setUploading(false);
-      return null;
-    }
-    const { data } = supabase.storage.from("forum-images").getPublicUrl(path);
-    setUploading(false);
-    return data.publicUrl;
-  };
+
   const create = async (e) => {
     e.preventDefault();
-    if (!title.trim() || !body.trim())
-      return setNotice("Completa título y contenido");
-    setLoading(true);
-    let imageUrl = null;
-    if (image) {
-      imageUrl = await uploadImage();
-      if (!imageUrl) {
-        setLoading(false);
-        return;
-      }
+
+    const safeTitle = clean(title);
+    const safeBody = clean(body);
+    if (safeTitle.length < 6 || safeTitle.length > 120) {
+      setNotice("El título debe tener entre 6 y 120 caracteres");
+      return;
     }
-    const { error } = await supabase
+
+    if (!safeBody) {
+      setNotice("El contenido no puede estar vacío");
+      return;
+    }
+
+    setPosting(true);
+    setNotice("");
+
+    const imageUrl = postImage
+      ? await uploadImage(postImage, setUploadingPostImage)
+      : null;
+
+    if (postImage && !imageUrl) {
+      setPosting(false);
+      return;
+    }
+
+    const { data, error } = await supabase
       .from("forum_posts")
       .insert({
         author_id: session.user.id,
-        title: clean(title),
-        body: clean(body),
+        title: safeTitle,
+        body: safeBody,
         category,
         status: "approved",
         image_url: imageUrl,
-      });
-    setNotice(error ? error.message : "✓ Publicación creada");
-    if (!error) {
-      setTitle("");
-      setBody("");
-      setImage(null);
-      setPreviewUrl("");
-      loadPosts();
+      })
+      .select("*,profiles(id,full_name,avatar_url)")
+      .single();
+
+    if (error) {
+      setNotice(`Error creando publicación: ${error.message}`);
+    } else {
+      setPosts((current) => [data, ...current]);
+      setReplyCount((current) => ({ ...current, [data.id]: 0 }));
+      resetPostComposer();
+      setNotice("Publicación creada correctamente");
     }
-    setLoading(false);
+
+    setPosting(false);
   };
+
   const sendReply = async (e) => {
     e.preventDefault();
-    if (!reply.trim()) return setNotice("El comentario no puede estar vacío");
-    setReplying(true);
-    let imageUrl = null;
-    if (image) {
-      imageUrl = await uploadImage();
-      if (!imageUrl) {
-        setReplying(false);
-        return;
-      }
+
+    if (!selected) return;
+
+    const safeReply = clean(reply);
+    if (!safeReply) {
+      setNotice("El comentario no puede estar vacío");
+      return;
     }
-    const { error } = await supabase
+
+    setReplying(true);
+    setNotice("");
+
+    const imageUrl = replyImage
+      ? await uploadImage(replyImage, setUploadingReplyImage)
+      : null;
+
+    if (replyImage && !imageUrl) {
+      setReplying(false);
+      return;
+    }
+
+    const { data, error } = await supabase
       .from("forum_replies")
       .insert({
         post_id: selected.id,
         author_id: session.user.id,
-        body: clean(reply),
+        body: safeReply,
         status: "approved",
         image_url: imageUrl,
-      });
-    setNotice(error ? error.message : "✓ Comentario publicado");
-    if (!error) {
-      setReply("");
-      setImage(null);
-      setPreviewUrl("");
-      const { count } = await supabase
-        .from("forum_replies")
-        .select("*", { count: "exact", head: true })
-        .eq("post_id", selected.id);
-      setReplyCount({ ...replyCount, [selected.id]: (count || 0) + 1 });
-      const { data } = await supabase
-        .from("forum_replies")
-        .select("*,profiles(full_name,avatar_url)")
-        .eq("post_id", selected.id)
-        .order("created_at");
-      setReplies(data || []);
+      })
+      .select("*,profiles(id,full_name,avatar_url)")
+      .single();
+
+    if (error) {
+      setNotice(`Error creando comentario: ${error.message}`);
+    } else {
+      setReplies((current) => [...current, data]);
+      setReplyCount((current) => ({
+        ...current,
+        [selected.id]: (current[selected.id] || 0) + 1,
+      }));
+      resetReplyComposer();
+      setNotice("Comentario creado correctamente");
     }
+
     setReplying(false);
   };
-  const filtered = useMemo(
-    () =>
-      posts.filter(
-        (p) =>
-          p.title.toLowerCase().includes(search.toLowerCase()) ||
-          p.body.toLowerCase().includes(search.toLowerCase()),
-      ),
-    [posts, search],
-  );
-  if (selected)
+
+  const filtered = useMemo(() => {
+    const normalizedQuery = search.trim().toLowerCase();
+    if (!normalizedQuery) return posts;
+
+    return posts.filter((post) =>
+      [
+        post.title,
+        post.body,
+        post.category,
+        post.profiles?.full_name,
+      ].some((value) => value?.toLowerCase().includes(normalizedQuery)),
+    );
+  }, [posts, search]);
+
+  if (selected) {
     return (
       <Page title={selected.title}>
         <button className="link" onClick={() => setSelected(null)}>
@@ -519,51 +749,51 @@ function Community({ session }) {
             />
             <div>
               <b>{selected.profiles?.full_name || "Anónimo"}</b>
-              <small>
-                {new Date(selected.created_at).toLocaleDateString("es-CO", {
-                  weekday: "short",
-                })}
-              </small>
+              <small>{formatDate(selected.created_at)}</small>
             </div>
           </div>
           <h2>{selected.title}</h2>
           <span className="tag">{selected.category}</span>
           <p>{selected.body}</p>
           {selected.image_url && (
-            <img src={selected.image_url} alt="post" className="post-image" />
+            <img src={selected.image_url} alt={selected.title} className="post-image" />
           )}
         </article>
         <div className="replies-section">
           <b>
-            {replies.length}{" "}
-            {replies.length === 1 ? "comentario" : "comentarios"}
+            {replyCount[selected.id] || replies.length} {""}
+            {(replyCount[selected.id] || replies.length) === 1
+              ? "comentario"
+              : "comentarios"}
           </b>
-          <div className="feed">
-            {replies.map((r) => (
-              <article className="reply" key={r.id}>
-                <Avatar
-                  url={r.profiles?.avatar_url}
-                  name={r.profiles?.full_name}
-                />
-                <div className="reply-content">
-                  <div>
-                    <b>{r.profiles?.full_name || "Anónimo"}</b>
-                    <small>
-                      {new Date(r.created_at).toLocaleDateString("es-CO")}
-                    </small>
+          {loadingReplies ? (
+            <div className="center">
+              <span className="spinner" />
+            </div>
+          ) : replies.length ? (
+            <div className="feed">
+              {replies.map((item) => (
+                <article className="reply" key={item.id}>
+                  <Avatar
+                    url={item.profiles?.avatar_url}
+                    name={item.profiles?.full_name}
+                  />
+                  <div className="reply-content">
+                    <div>
+                      <b>{item.profiles?.full_name || "Anónimo"}</b>
+                      <small>{formatDate(item.created_at)}</small>
+                    </div>
+                    <p>{item.body}</p>
+                    {item.image_url && (
+                      <img src={item.image_url} alt="comentario" className="reply-image" />
+                    )}
                   </div>
-                  <p>{r.body}</p>
-                  {r.image_url && (
-                    <img
-                      src={r.image_url}
-                      alt="reply"
-                      className="reply-image"
-                    />
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="empty">Aún no hay comentarios. Sé el primero en comentar.</div>
+          )}
         </div>
         {!selected.locked && (
           <form className="card composer" onSubmit={sendReply}>
@@ -574,16 +804,10 @@ function Community({ session }) {
               placeholder="Escribe un comentario…"
               maxLength="2000"
             />
-            {previewUrl && (
+            {replyPreviewUrl && (
               <div className="preview">
-                <img src={previewUrl} alt="preview" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImage(null);
-                    setPreviewUrl("");
-                  }}
-                >
+                <p>Imagen seleccionada: {replyImage?.name || "archivo"}</p>
+                <button type="button" onClick={resetReplyComposer}>
                   ✕
                 </button>
               </div>
@@ -592,18 +816,24 @@ function Community({ session }) {
               + Imagen
               <input
                 type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => handleImageSelect(e, "reply")}
               />
             </label>
-            <button disabled={replying || uploading}>
-              {uploading ? "Subiendo…" : replying ? "Enviando…" : "Comentar"}
+            <button disabled={replying || uploadingReplyImage}>
+              {uploadingReplyImage
+                ? "Subiendo…"
+                : replying
+                  ? "Enviando…"
+                  : "Comentar"}
             </button>
           </form>
         )}
         {notice && <Notice>{notice}</Notice>}
       </Page>
     );
+  }
+
   return (
     <Page title="Comunidad">
       <div className="community-header">
@@ -625,15 +855,10 @@ function Community({ session }) {
           </label>
           <label>
             Categoría
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              {["General", "Prevención", "Amenazas", "Ayuda técnica"].map(
-                (x) => (
-                  <option key={x}>{x}</option>
-                ),
-              )}
+            <select value={category} onChange={(e) => setCategory(e.target.value)}>
+              {POST_CATEGORIES.map((item) => (
+                <option key={item}>{item}</option>
+              ))}
             </select>
           </label>
           <textarea
@@ -643,26 +868,24 @@ function Community({ session }) {
             placeholder="Comparte tu duda o conocimiento…"
             maxLength="4000"
           />
-          {previewUrl && (
+          {postPreviewUrl && (
             <div className="preview">
-              <img src={previewUrl} alt="preview" />
-              <button
-                type="button"
-                onClick={() => {
-                  setImage(null);
-                  setPreviewUrl("");
-                }}
-              >
+              <p>Imagen seleccionada: {postImage?.name || "archivo"}</p>
+              <button type="button" onClick={resetPostComposer}>
                 ✕
               </button>
             </div>
           )}
           <label className="file-input">
             + Imagen
-            <input type="file" accept="image/*" onChange={handleImageSelect} />
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => handleImageSelect(e, "post")}
+            />
           </label>
-          <button disabled={loading || uploading}>
-            {uploading ? "Subiendo…" : loading ? "Publicando…" : "Publicar"}
+          <button disabled={posting || uploadingPostImage}>
+            {uploadingPostImage ? "Subiendo…" : posting ? "Publicando…" : "Publicar"}
           </button>
           {notice && <p className="info">{notice}</p>}
         </form>
@@ -671,61 +894,52 @@ function Community({ session }) {
             <Search size={18} />
             <input
               aria-label="Buscar"
-              placeholder="Buscar publicaciones…"
+              placeholder="Buscar por título, contenido, categoría o autor…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
         </div>
         <div className="posts-feed">
-          {loading && !posts.length ? (
+          {loadingPosts && !posts.length ? (
             <div className="center">
               <span className="spinner" />
             </div>
           ) : filtered.length > 0 ? (
-            filtered.map((p) => (
-              <button
-                className="post-card"
-                key={p.id}
-                onClick={() => setSelected(p)}
-              >
+            filtered.map((post) => (
+              <button className="post-card" key={post.id} onClick={() => setSelected(post)}>
                 <div className="post-header">
                   <Avatar
-                    url={p.profiles?.avatar_url}
-                    name={p.profiles?.full_name}
+                    url={post.profiles?.avatar_url}
+                    name={post.profiles?.full_name}
                   />
                   <div>
-                    <b>{p.profiles?.full_name || "Anónimo"}</b>
-                    <small>
-                      {new Date(p.created_at).toLocaleDateString("es-CO")}
-                    </small>
+                    <b>{post.profiles?.full_name || "Anónimo"}</b>
+                    <small>{formatDate(post.created_at)}</small>
                   </div>
                 </div>
                 <div className="post-content">
-                  <h3>{p.title}</h3>
-                  <span className="tag">{p.category}</span>
-                  <p>{p.body.substring(0, 150)}…</p>
-                  {p.image_url && (
+                  <h3>{post.title}</h3>
+                  <span className="tag">{post.category}</span>
+                  <p>
+                    {post.body.length > 150
+                      ? `${post.body.slice(0, 150)}…`
+                      : post.body}
+                  </p>
+                  {post.image_url && (
                     <div className="post-thumb">
-                      <img src={p.image_url} alt="thumb" />
+                      <img src={post.image_url} alt={post.title} />
                     </div>
                   )}
                 </div>
-                <div className="post-footer">💬 {replyCount[p.id] || 0}</div>
+                <div className="post-footer">💬 {replyCount[post.id] || 0}</div>
               </button>
             ))
           ) : (
             <div className="empty">
-              <h2>Aún no hay publicaciones</h2>
-              <p>Escribe tu primera duda o recomendación en el formulario.</p>
-              {notice ? (
-                <Notice>{notice}</Notice>
-              ) : (
-                <p className="info">
-                  Si al publicar aparece un error, ejecuta la migración 004 en
-                  Supabase.
-                </p>
-              )}
+              {search.trim()
+                ? "No hay publicaciones que coincidan con tu búsqueda."
+                : "Aún no hay publicaciones. Sé el primero en publicar."}
             </div>
           )}
         </div>
@@ -733,90 +947,155 @@ function Community({ session }) {
     </Page>
   );
 }
-function Profile({ session, profile }) {
-  const [name, setName] = useState(profile?.full_name || ""),
-    [msg, setMsg] = useState(""),
-    [uploading, setUploading] = useState(false),
-    [previewUrl, setPreviewUrl] = useState(profile?.avatar_url || "");
+
+function Profile({ session, profile, refreshProfile }) {
+  const [name, setName] = useState(profile?.full_name || "");
+  const [msg, setMsg] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(profile?.avatar_url || "");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  useEffect(() => {
+    setName(profile?.full_name || "");
+    setPreviewUrl(profile?.avatar_url || "");
+  }, [profile?.avatar_url, profile?.full_name]);
+
   const save = async (e) => {
     e.preventDefault();
-    const { error } = await supabase
+
+    const safeName = clean(name);
+    if (safeName.length < 2 || safeName.length > 60) {
+      setMsg("El nombre debe tener entre 2 y 60 caracteres");
+      return;
+    }
+
+    if (password && password.length < 8) {
+      setMsg("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+
+    if (password && password !== confirmPassword) {
+      setMsg("Las contraseñas no coinciden");
+      return;
+    }
+
+    setSaving(true);
+    setMsg("");
+
+    const { error: profileError } = await supabase
       .from("profiles")
-      .update({ full_name: clean(name) })
+      .update({ full_name: safeName })
       .eq("id", session.user.id);
-    setMsg(error ? error.message : "✓ Perfil actualizado");
+
+    if (profileError) {
+      setMsg(`Error actualizando perfil: ${profileError.message}`);
+      setSaving(false);
+      return;
+    }
+
+    if (password) {
+      const { error: passwordError } = await supabase.auth.updateUser({ password });
+      if (passwordError) {
+        setMsg(`Error actualizando perfil: ${passwordError.message}`);
+        setSaving(false);
+        return;
+      }
+    }
+
+    await refreshProfile(session.user.id);
+    setPassword("");
+    setConfirmPassword("");
+    setMsg("Perfil actualizado correctamente");
+    setSaving(false);
   };
+
   const handleAvatarSelect = async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(f.type)) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!IMAGE_TYPES.includes(file.type)) {
       setMsg("Solo JPG, PNG o WebP");
       return;
     }
-    if (f.size > 2097152) {
-      setMsg("Foto debe ser menor a 2MB");
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      setMsg("La imagen debe ser menor o igual a 5 MB");
       return;
     }
+
     setUploading(true);
-    const ext = f.name.split(".").pop();
+    setMsg("");
+
     const folder = session.user.id;
+    const ext = file.name.split(".").pop();
     const path = `${folder}/avatar-${Date.now()}.${ext}`;
+
     const { data: files, error: listError } = await supabase.storage
       .from("avatars")
       .list(folder);
+
     if (listError) {
-      setMsg(`Error preparando foto: ${listError.message}`);
+      setMsg(`Error actualizando perfil: ${listError.message}`);
       setUploading(false);
       return;
     }
+
     if (files?.length) {
       const { error: removeError } = await supabase.storage
         .from("avatars")
-        .remove(files.map((file) => `${folder}/${file.name}`));
+        .remove(files.map((item) => `${folder}/${item.name}`));
+
       if (removeError) {
-        setMsg(`Error reemplazando foto: ${removeError.message}`);
+        setMsg(`Error actualizando perfil: ${removeError.message}`);
         setUploading(false);
         return;
       }
     }
-    const { error: upError } = await supabase.storage
+
+    const { error: uploadError } = await supabase.storage
       .from("avatars")
-      .upload(path, f, { upsert: true });
-    if (upError) {
-      setMsg("Error subiendo foto");
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      setMsg(`Error actualizando perfil: ${uploadError.message}`);
       setUploading(false);
       return;
     }
+
     const { data } = supabase.storage.from("avatars").getPublicUrl(path);
     const { error: dbError } = await supabase
       .from("profiles")
       .update({ avatar_url: data.publicUrl })
       .eq("id", session.user.id);
+
     if (dbError) {
-      setMsg("Error guardando foto");
+      setMsg(`Error actualizando perfil: ${dbError.message}`);
       setUploading(false);
       return;
     }
+
     setPreviewUrl(data.publicUrl);
-    setMsg("✓ Foto actualizada");
+    await refreshProfile(session.user.id);
+    setMsg("Avatar actualizado correctamente");
     setUploading(false);
   };
+
   return (
     <Page title="Mi perfil">
       <form className="card form" onSubmit={save}>
         <div className="profile-avatar">
-          <img
-            src={
-              previewUrl ||
-              "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect fill=%22%23ccc%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%22 y=%2250%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23666%22 font-size=%2240%22%3EU%3C/text%3E%3C/svg%3E"
-            }
-            alt="avatar"
+          <Avatar
+            url={previewUrl}
+            name={name || profile?.full_name || session.user.email || "Usuario"}
+            className="profile-avatar-media"
           />
           <label className="file-input-avatar">
-            Cambiar
+            {uploading ? "Subiendo…" : "Cambiar"}
             <input
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handleAvatarSelect}
               disabled={uploading}
             />
@@ -828,6 +1107,7 @@ function Profile({ session, profile }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
+            minLength="2"
             maxLength="60"
           />
         </label>
@@ -835,56 +1115,87 @@ function Profile({ session, profile }) {
           Correo
           <input value={session.user.email} disabled />
         </label>
-        <button>{uploading ? "Guardando…" : "Guardar cambios"}</button>
+        <label>
+          Nueva contraseña
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength="8"
+            placeholder="Déjala vacía si no deseas cambiarla"
+          />
+        </label>
+        <label>
+          Confirmar contraseña
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            minLength="8"
+            placeholder="Repite la nueva contraseña"
+          />
+        </label>
+        <button disabled={saving || uploading}>
+          {saving ? "Guardando…" : "Guardar cambios"}
+        </button>
         {msg && <p>{msg}</p>}
       </form>
     </Page>
   );
 }
+
 function AdminCollection({ table, fields, title }) {
-  const [rows, setRows] = useState([]),
-    [draft, setDraft] = useState({}),
-    [msg, setMsg] = useState("");
+  const [rows, setRows] = useState([]);
+  const [draft, setDraft] = useState({});
+  const [msg, setMsg] = useState("");
+
   const load = async () => {
     const { data, error } = await supabase
       .from(table)
       .select("*")
       .order("created_at", { ascending: false });
+
     setRows(data || []);
     setMsg(error?.message || "");
   };
+
   useEffect(() => {
     load();
   }, [table]);
+
   const save = async (e) => {
     e.preventDefault();
-    const payload = Object.fromEntries(fields.map((f) => [f, draft[f] || ""]));
+    const payload = Object.fromEntries(fields.map((field) => [field, draft[field] || ""]));
     const { error } = draft.id
       ? await supabase.from(table).update(payload).eq("id", draft.id)
       : await supabase.from(table).insert(payload);
+
     setMsg(error ? error.message : "Cambio guardado.");
     setDraft({});
     load();
   };
+
   const remove = async (id) => {
-    if (!confirm("¿Eliminar este registro?")) return;
+    if (!window.confirm("¿Eliminar este registro?")) return;
+
     const { error } = await supabase.from(table).delete().eq("id", id);
     setMsg(error ? error.message : "Registro eliminado.");
     load();
   };
+
   return (
     <section className="admin-split">
       <form className="card form" onSubmit={save}>
         <h2>
           {draft.id ? "Editar" : "Nuevo"} {title}
         </h2>
-        {fields.map((f) => (
-          <label key={f}>
-            {f.replaceAll("_", " ")}
+        {fields.map((field) => (
+          <label key={field}>
+            {field.replaceAll("_", " ")}
             <textarea
               required
-              value={draft[f] || ""}
-              onChange={(e) => setDraft({ ...draft, [f]: e.target.value })}
+              value={draft[field] || ""}
+              onChange={(e) => setDraft({ ...draft, [field]: e.target.value })}
             />
           </label>
         ))}
@@ -911,78 +1222,78 @@ function AdminCollection({ table, fields, title }) {
     </section>
   );
 }
+
 function Moderation({ table = "comments", label = "comentarios" }) {
-  const [rows, setRows] = useState([]),
-    [error, setError] = useState("");
+  const [rows, setRows] = useState([]);
+  const [error, setError] = useState("");
+
   const load = () => {
-    let query = supabase
-      .from(table)
-      .select(
-        table === "comments"
-          ? "*,profiles(full_name)"
-          : table === "forum_posts"
-            ? "*,profiles(full_name,avatar_url)"
-            : "*,profiles(full_name,avatar_url),forum_posts(title)",
-      );
-    query.order("created_at", { ascending: false }).then(({ data, error }) => {
+    let query = supabase.from(table).select(
+      table === "comments"
+        ? "*,profiles(full_name)"
+        : table === "forum_posts"
+          ? "*,profiles(full_name,avatar_url)"
+          : "*,profiles(full_name,avatar_url),forum_posts(title)",
+    );
+
+    query.order("created_at", { ascending: false }).then(({ data, error: loadError }) => {
       setRows(data || []);
-      setError(error?.message || "");
+      setError(loadError?.message || "");
     });
   };
+
   useEffect(() => {
     load();
   }, [table]);
+
   const act = async (id, status) => {
-    const { error: actError } = await supabase
-      .from(table)
-      .update({ status })
-      .eq("id", id);
+    const { error: actError } = await supabase.from(table).update({ status }).eq("id", id);
     if (actError) setError(actError.message);
     else load();
   };
+
   const deleteItem = async (id) => {
-    if (!confirm("¿Eliminar?")) return;
-    const { error: delError } = await supabase
-      .from(table)
-      .delete()
-      .eq("id", id);
-    if (delError) setError(delError.message);
+    if (!window.confirm("¿Eliminar?")) return;
+
+    const { error: deleteError } = await supabase.from(table).delete().eq("id", id);
+    if (deleteError) setError(deleteError.message);
     else load();
   };
+
   return (
     <section className="feed">
       {error && <Notice>{error}</Notice>}
-      {rows.map((r) => (
-        <article className="comment" key={r.id}>
-          <b>{r.profiles?.full_name || "Usuario"}</b>
-          {table === "forum_posts" && <h3>{r.title}</h3>}
-          {table === "forum_replies" && r.forum_posts && (
-            <small>Respuesta en: {r.forum_posts.title}</small>
+      {rows.map((row) => (
+        <article className="comment" key={row.id}>
+          <b>{row.profiles?.full_name || "Usuario"}</b>
+          {table === "forum_posts" && <h3>{row.title}</h3>}
+          {table === "forum_replies" && row.forum_posts && (
+            <small>Respuesta en: {row.forum_posts.title}</small>
           )}
-          <p>{r.body}</p>
-          {r.image_url && (
+          <p>{row.body}</p>
+          {row.image_url && (
             <img
-              src={r.image_url}
+              src={row.image_url}
               alt="mod"
               style={{ maxHeight: "100px", borderRadius: "4px" }}
             />
           )}
           <div>
-            <button onClick={() => act(r.id, "approved")}>Aprobar</button>
-            <button className="danger" onClick={() => deleteItem(r.id)}>
+            <button onClick={() => act(row.id, "approved")}>Aprobar</button>
+            <button className="danger" onClick={() => deleteItem(row.id)}>
               Eliminar
             </button>
           </div>
         </article>
       ))}
-      {!error && !rows.length && (
-        <div className="empty">Sin {label} pendientes.</div>
-      )}
+      {!error && !rows.length && <div className="empty">Sin {label} registrados.</div>}
     </section>
   );
 }
+
 function Admin() {
   const [view, setView] = useState("methods");
+
   return (
     <Page title="Centro de control">
       <div className="admin-tabs">
@@ -1024,20 +1335,17 @@ function Admin() {
         />
       )}{" "}
       {view === "comments" && <Moderation />}
-      {view === "posts" && (
-        <Moderation table="forum_posts" label="temas del foro" />
-      )}
-      {view === "replies" && (
-        <Moderation table="forum_replies" label="respuestas" />
-      )}
+      {view === "posts" && <Moderation table="forum_posts" label="temas del foro" />}
+      {view === "replies" && <Moderation table="forum_replies" label="respuestas" />}
     </Page>
   );
 }
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        {({ session, profile }) => (
+        {({ session, profile, refreshProfile }) => (
           <Routes>
             <Route path="/acceso" element={<Access />} />
             <Route path="/registro" element={<Access registerDefault />} />
@@ -1085,7 +1393,11 @@ export default function App() {
               path="/perfil"
               element={
                 <Protected session={session} profile={profile}>
-                  <Profile session={session} profile={profile} />
+                  <Profile
+                    session={session}
+                    profile={profile}
+                    refreshProfile={refreshProfile}
+                  />
                 </Protected>
               }
             />
@@ -1097,10 +1409,7 @@ export default function App() {
                 </Protected>
               }
             />
-            <Route
-              path="*"
-              element={<Navigate to={session ? "/inicio" : "/acceso"} />}
-            />
+            <Route path="*" element={<Navigate to={session ? "/inicio" : "/acceso"} />} />
           </Routes>
         )}
       </AuthProvider>
