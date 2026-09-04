@@ -806,7 +806,7 @@ function Community({ session }) {
             />
             {replyPreviewUrl && (
               <div className="preview">
-                <img src={replyPreviewUrl} alt="Vista previa del comentario" />
+                <p>Imagen seleccionada: {replyImage?.name || "archivo"}</p>
                 <button type="button" onClick={resetReplyComposer}>
                   ✕
                 </button>
@@ -870,7 +870,7 @@ function Community({ session }) {
           />
           {postPreviewUrl && (
             <div className="preview">
-              <img src={postPreviewUrl} alt="Vista previa de la publicación" />
+              <p>Imagen seleccionada: {postImage?.name || "archivo"}</p>
               <button type="button" onClick={resetPostComposer}>
                 ✕
               </button>
