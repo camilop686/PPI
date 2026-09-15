@@ -31,6 +31,19 @@ const nav = [
   ["/perfil", "Perfil", Settings],
 ];
 const clean = (value) => value.replace(/<[^>]*>/g, "").trim();
+const appUrl = () => `${window.location.origin}${import.meta.env.BASE_URL}`;
+const confirmationRedirect = () => `${appUrl()}confirmacion`;
+const isConfirmationError = (error) => {
+  const code = error?.code || "";
+  const message = (error?.message || "").toLowerCase();
+  return (
+    code === "email_not_confirmed" ||
+    code === "user_already_exists" ||
+    message.includes("email not confirmed") ||
+    message.includes("already registered") ||
+    message.includes("already exists")
+  );
+};
 const Loading = () => (
   <div className="center">
     <span className="spinner" />
@@ -118,7 +131,9 @@ function Access({ registerDefault = false }) {
   const [register, setRegister] = useState(registerDefault),
     [recovery, setRecovery] = useState(false),
     [busy, setBusy] = useState(false),
-    [message, setMessage] = useState("");
+    [message, setMessage] = useState(""),
+    [resendEmail, setResendEmail] = useState(""),
+    [canResend, setCanResend] = useState(false);
   const go = useNavigate();
   const submit = async (e) => {
     e.preventDefault();
@@ -129,31 +144,56 @@ function Access({ registerDefault = false }) {
     const f = new FormData(e.currentTarget),
       email = String(f.get("email")).trim(),
       password = String(f.get("password"));
+    setResendEmail(email);
     setBusy(true);
     let error;
     if (recovery)
       ({ error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${location.origin}/perfil`,
+        redirectTo: `${appUrl()}perfil`,
       }));
     else if (register)
       ({ error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: clean(String(f.get("name"))) } },
+        options: {
+          data: { full_name: clean(String(f.get("name"))) },
+          emailRedirectTo: confirmationRedirect(),
+        },
       }));
     else
       ({ error } = await supabase.auth.signInWithPassword({ email, password }));
     setBusy(false);
+    const confirmationError = isConfirmationError(error);
+    setCanResend(!recovery && (confirmationError || (!error && register)));
     setMessage(
       error
-        ? error.message
-        : recovery
-          ? "Revisa tu correo para continuar."
+        ? confirmationError
+          ? "Este correo todavía no ha sido confirmado."
           : register
-            ? "Cuenta creada. Confirma tu correo antes de iniciar sesión."
+            ? "No se pudo crear la cuenta. Revisa los datos e inténtalo nuevamente."
+            : "No se pudo iniciar sesión. Revisa tu correo y contraseña."
+        : recovery
+          ? "Revisa tu correo para cambiar tu contraseña."
+          : register
+            ? "Revisa tu correo para confirmar tu cuenta."
             : "",
     );
     if (!error && !register && !recovery) go("/inicio");
+  };
+  const resendConfirmation = async () => {
+    if (!resendEmail) return;
+    setBusy(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: resendEmail,
+      options: { emailRedirectTo: confirmationRedirect() },
+    });
+    setBusy(false);
+    setMessage(
+      error
+        ? "No se pudo enviar el correo. Inténtalo nuevamente."
+        : "Te enviamos nuevamente el correo de confirmación.",
+    );
   };
   return (
     <div className="auth">
@@ -175,6 +215,16 @@ function Access({ registerDefault = false }) {
               : "Acceso seguro"}
         </h2>
         {message && <Notice>{message}</Notice>}
+        {canResend && (
+          <button
+            type="button"
+            className="link"
+            onClick={resendConfirmation}
+            disabled={busy}
+          >
+            Reenviar correo de confirmación
+          </button>
+        )}
         {register && (
           <label>
             Nombre completo
@@ -217,12 +267,40 @@ function Access({ registerDefault = false }) {
             onClick={() => {
               setRegister(!register);
               setMessage("");
+              setCanResend(false);
             }}
           >
             {register ? "Volver a iniciar sesión" : "Crear una cuenta"}
           </button>
         )}
       </form>
+    </div>
+  );
+}
+function EmailConfirmation({ session }) {
+  const go = useNavigate();
+  return (
+    <div className="auth">
+      <section>
+        <img className="auth-logo" src={logo} alt="Logotipo PPI" />
+        <p className="eyebrow">CENTRO DE DEFENSA DIGITAL</p>
+        <h1>{session ? "Correo confirmado" : "Confirmación de correo"}</h1>
+        <p>
+          {session
+            ? "Tu cuenta ya está activa. Puedes continuar en PPI."
+            : "No pudimos completar la confirmación. Solicita un nuevo correo desde Crear cuenta."}
+        </p>
+      </section>
+      <div className="card">
+        <Notice>
+          {session
+            ? "Tu correo fue confirmado correctamente."
+            : "El enlace puede haber expirado o ya fue utilizado."}
+        </Notice>
+        <button type="button" onClick={() => go(session ? "/inicio" : "/registro")}>
+          {session ? "Continuar" : "Volver a crear cuenta"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -1035,12 +1113,16 @@ function Admin() {
 }
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/PPI">
       <AuthProvider>
         {({ session, profile }) => (
           <Routes>
             <Route path="/acceso" element={<Access />} />
             <Route path="/registro" element={<Access registerDefault />} />
+            <Route
+              path="/confirmacion"
+              element={<EmailConfirmation session={session} />}
+            />
             <Route
               path="/inicio"
               element={
