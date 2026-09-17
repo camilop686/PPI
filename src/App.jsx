@@ -33,6 +33,25 @@ const nav = [
 const clean = (value) => value.replace(/<[^>]*>/g, "").trim();
 const appUrl = () => `${window.location.origin}${import.meta.env.BASE_URL}`;
 const confirmationRedirect = () => `${appUrl()}confirmacion`;
+const authErrorMessage = (error, register) => {
+  if (!error) return "";
+  const message = (error.message || "").toLowerCase();
+  if (message.includes("password should be at least"))
+    return "La contraseña debe tener al menos 8 caracteres.";
+  if (message.includes("email rate limit exceeded"))
+    return "Se alcanzó el límite de correos de registro. Inténtalo más tarde.";
+  if (message.includes("invalid login credentials"))
+    return "El correo o la contraseña no son correctos.";
+  if (message.includes("redirect url"))
+    return "La URL de confirmación no está autorizada en Supabase. Añádela en Authentication > URL Configuration.";
+  if (message.includes("database error saving new user"))
+    return "Supabase no pudo crear el perfil. Ejecuta el esquema y las migraciones de la carpeta supabase en orden.";
+  if (message.includes("user already registered"))
+    return "Este correo ya tiene una cuenta. Inicia sesión o recupera la contraseña.";
+  return register
+    ? `No se pudo crear la cuenta: ${error.message}`
+    : `No se pudo iniciar sesión: ${error.message}`;
+};
 const isConfirmationError = (error) => {
   const code = error?.code || "";
   const message = (error?.message || "").toLowerCase();
@@ -142,8 +161,11 @@ function Access({ registerDefault = false }) {
         "Configura las variables de Supabase para activar el acceso.",
       );
     const f = new FormData(e.currentTarget),
+      name = register ? clean(String(f.get("name"))) : "",
       email = String(f.get("email")).trim(),
       password = String(f.get("password"));
+    if (register && name.length < 2)
+      return setMessage("Escribe un nombre válido de al menos 2 caracteres.");
     setResendEmail(email);
     setBusy(true);
     let error;
@@ -156,7 +178,7 @@ function Access({ registerDefault = false }) {
         email,
         password,
         options: {
-          data: { full_name: clean(String(f.get("name"))) },
+          data: { full_name: name },
           emailRedirectTo: confirmationRedirect(),
         },
       }));
@@ -169,9 +191,7 @@ function Access({ registerDefault = false }) {
       error
         ? confirmationError
           ? "Este correo todavía no ha sido confirmado."
-          : register
-            ? "No se pudo crear la cuenta. Revisa los datos e inténtalo nuevamente."
-            : "No se pudo iniciar sesión. Revisa tu correo y contraseña."
+          : authErrorMessage(error, register)
         : recovery
           ? "Revisa tu correo para cambiar tu contraseña."
           : register
@@ -843,7 +863,7 @@ function Profile({ session, profile }) {
       .from("avatars")
       .list(folder);
     if (listError) {
-      setMsg(`Error preparando foto: ${listError.message}`);
+      setMsg(`No se pudo preparar la foto: ${listError.message}`);
       setUploading(false);
       return;
     }
@@ -852,7 +872,7 @@ function Profile({ session, profile }) {
         .from("avatars")
         .remove(files.map((file) => `${folder}/${file.name}`));
       if (removeError) {
-        setMsg(`Error reemplazando foto: ${removeError.message}`);
+        setMsg(`No se pudo reemplazar la foto: ${removeError.message}`);
         setUploading(false);
         return;
       }
@@ -861,7 +881,7 @@ function Profile({ session, profile }) {
       .from("avatars")
       .upload(path, f, { upsert: true });
     if (upError) {
-      setMsg("Error subiendo foto");
+      setMsg(`No se pudo subir la foto: ${upError.message}`);
       setUploading(false);
       return;
     }
@@ -871,7 +891,7 @@ function Profile({ session, profile }) {
       .update({ avatar_url: data.publicUrl })
       .eq("id", session.user.id);
     if (dbError) {
-      setMsg("Error guardando foto");
+      setMsg(`La foto se subió, pero no se guardó el perfil: ${dbError.message}`);
       setUploading(false);
       return;
     }
