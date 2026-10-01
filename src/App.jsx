@@ -18,6 +18,7 @@ import {
   Bug,
   Search,
   Settings,
+<<<<<<< HEAD
 } from "lucide-react";
 import { supabase, isConfigured } from "./lib/supabase";
 import logo from "../logo.png";
@@ -69,15 +70,69 @@ const Loading = () => (
     Cargando plataforma segura…
   </div>
 );
+=======
+  Download,
+} from "lucide-react";
+import { supabase, isConfigured } from "./lib/supabase";
+import { LanguageProvider } from "./i18n/LanguageContext";
+import { useLanguage } from "./i18n/useLanguage";
+import logo from "../logo.png";
+import "./App.css";
+import "./i18n/language.css";
+import "./forum.css";
+import "./manuals.css";
+
+const nav = [
+  ["/inicio", "nav.home", ShieldCheck],
+  ["/metodos", "nav.methods", BookOpen],
+  ["/amenazas", "nav.threats", Bug],
+  ["/comunidad", "nav.community", MessageSquare],
+  ["/perfil", "nav.profile", Settings],
+  ["/manuales", "nav.manuals", BookOpen],
+];
+const clean = (value) => value.replace(/<[^>]*>/g, "").trim();
+function Loading() {
+  const { t } = useLanguage();
+  return (
+    <div className="center" role="status" aria-live="polite">
+      <span className="spinner" aria-hidden="true" />
+      {t("common.loading")}
+    </div>
+  );
+}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
 const Notice = ({ children }) => (
   <div className="notice">
     <AlertCircle size={18} />
     {children}
   </div>
 );
+<<<<<<< HEAD
 function AuthProvider({ children }) {
   const [session, setSession] = useState(undefined),
     [profile, setProfile] = useState(undefined);
+=======
+function LanguageSwitcher({ className = "" }) {
+  const { language, changeLanguage, t } = useLanguage();
+  return (
+    <label className={`language-switcher ${className}`}>
+      <span aria-hidden="true">🌐</span>
+      <span>{t("language.label")}</span>
+      <select
+        aria-label={t("language.select")}
+        value={language}
+        onChange={(event) => changeLanguage(event.target.value)}
+      >
+        <option value="es">🇪🇸 Español</option>
+        <option value="en">🇺🇸 English</option>
+      </select>
+    </label>
+  );
+}
+function AuthProvider({ children }) {
+  const [session, setSession] = useState(undefined),
+    [profile, setProfile] = useState(null);
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
   useEffect(() => {
     if (!isConfigured) return setSession(null);
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -88,12 +143,16 @@ function AuthProvider({ children }) {
   }, []);
   useEffect(() => {
     if (!session) return setProfile(null);
+<<<<<<< HEAD
     setProfile(undefined);
+=======
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
     supabase
       .from("profiles")
       .select("*")
       .eq("id", session.user.id)
       .single()
+<<<<<<< HEAD
       .then(({ data }) => setProfile(data || null));
   }, [session]);
   return session === undefined || (session && profile === undefined) ? (
@@ -103,6 +162,14 @@ function AuthProvider({ children }) {
   );
 }
 function Layout({ children, profile }) {
+=======
+      .then(({ data }) => setProfile(data));
+  }, [session]);
+  return session === undefined ? <Loading /> : children({ session, profile });
+}
+function Layout({ children, profile }) {
+  const { t } = useLanguage();
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
   const go = useNavigate();
   const logout = async () => {
     await supabase.auth.signOut();
@@ -114,19 +181,28 @@ function Layout({ children, profile }) {
         <div className="brand">
           <img src={logo} alt="PPI" />{" "}
           <span>
+<<<<<<< HEAD
             PPI<small>Centro de defensa digital</small>
+=======
+            PPI<small>{t("nav.tagline")}</small>
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
           </span>
         </div>
         <nav>
           {nav.map(([to, label, I]) => (
             <NavLink key={to} to={to}>
               <I size={18} />
+<<<<<<< HEAD
               {label}
+=======
+              {t(label)}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
             </NavLink>
           ))}
           {profile?.role === "admin" && (
             <NavLink to="/admin">
               <BarChart3 size={18} />
+<<<<<<< HEAD
               Administración
             </NavLink>
           )}
@@ -134,6 +210,16 @@ function Layout({ children, profile }) {
         <button className="ghost" onClick={logout}>
           <LogOut size={18} />
           Cerrar sesión
+=======
+              {t("nav.admin")}
+            </NavLink>
+          )}
+        </nav>
+        <LanguageSwitcher />
+        <button className="ghost" onClick={logout}>
+          <LogOut size={18} />
+          {t("nav.logout")}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
         </button>
       </aside>
       <main>{children}</main>
@@ -147,16 +233,25 @@ function Protected({ session, profile, admin, children }) {
   return <Layout profile={profile}>{children}</Layout>;
 }
 function Access({ registerDefault = false }) {
+<<<<<<< HEAD
   const [register, setRegister] = useState(registerDefault),
     [recovery, setRecovery] = useState(false),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
     [resendEmail, setResendEmail] = useState(""),
     [canResend, setCanResend] = useState(false);
+=======
+  const { t } = useLanguage();
+  const [register, setRegister] = useState(registerDefault),
+    [recovery, setRecovery] = useState(false),
+    [busy, setBusy] = useState(false),
+    [message, setMessage] = useState("");
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
   const go = useNavigate();
   const submit = async (e) => {
     e.preventDefault();
     if (!isConfigured)
+<<<<<<< HEAD
       return setMessage(
         "Configura las variables de Supabase para activar el acceso.",
       );
@@ -167,24 +262,39 @@ function Access({ registerDefault = false }) {
     if (register && name.length < 2)
       return setMessage("Escribe un nombre válido de al menos 2 caracteres.");
     setResendEmail(email);
+=======
+      return setMessage("auth.setupSupabase");
+    const f = new FormData(e.currentTarget),
+      email = String(f.get("email")).trim(),
+      password = String(f.get("password"));
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
     setBusy(true);
     let error;
     if (recovery)
       ({ error } = await supabase.auth.resetPasswordForEmail(email, {
+<<<<<<< HEAD
         redirectTo: `${appUrl()}perfil`,
+=======
+        redirectTo: `${location.origin}/perfil`,
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
       }));
     else if (register)
       ({ error } = await supabase.auth.signUp({
         email,
         password,
+<<<<<<< HEAD
         options: {
           data: { full_name: name },
           emailRedirectTo: confirmationRedirect(),
         },
+=======
+        options: { data: { full_name: clean(String(f.get("name"))) } },
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
       }));
     else
       ({ error } = await supabase.auth.signInWithPassword({ email, password }));
     setBusy(false);
+<<<<<<< HEAD
     const confirmationError = isConfirmationError(error);
     setCanResend(!recovery && (confirmationError || (!error && register)));
     setMessage(
@@ -196,10 +306,20 @@ function Access({ registerDefault = false }) {
           ? "Revisa tu correo para cambiar tu contraseña."
           : register
             ? "Revisa tu correo para confirmar tu cuenta."
+=======
+    setMessage(
+      error
+        ? "auth.authError"
+        : recovery
+          ? "auth.recoverySent"
+          : register
+            ? "auth.registrationSent"
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
             : "",
     );
     if (!error && !register && !recovery) go("/inicio");
   };
+<<<<<<< HEAD
   const resendConfirmation = async () => {
     if (!resendEmail) return;
     setBusy(true);
@@ -225,10 +345,21 @@ function Access({ registerDefault = false }) {
           PPI es tu consola de aprendizaje para proteger cuentas, datos y
           dispositivos.
         </p>
+=======
+  return (
+    <div className="auth">
+      <LanguageSwitcher className="auth-language-switcher" />
+      <section>
+        <img className="auth-logo" src={logo} alt="PPI" />
+        <p className="eyebrow">{t("auth.eyebrow")}</p>
+        <h1>{t("auth.headline")}</h1>
+        <p>{t("auth.intro")}</p>
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
       </section>
       <form className="card" onSubmit={submit}>
         <h2>
           {recovery
+<<<<<<< HEAD
             ? "Recuperar contraseña"
             : register
               ? "Crear cuenta"
@@ -248,27 +379,55 @@ function Access({ registerDefault = false }) {
         {register && (
           <label>
             Nombre completo
+=======
+            ? t("auth.recoveryTitle")
+            : register
+              ? t("auth.registerTitle")
+              : t("auth.loginTitle")}
+        </h2>
+        {message && <Notice>{t(message)}</Notice>}
+        {register && (
+          <label>
+            {t("auth.fullName")}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
             <input name="name" required minLength="2" maxLength="60" />
           </label>
         )}
         <label>
+<<<<<<< HEAD
           Correo electrónico
+=======
+          {t("auth.email")}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
           <input name="email" type="email" required />
         </label>
         {!recovery && (
           <label>
+<<<<<<< HEAD
             Contraseña
+=======
+            {t("auth.password")}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
             <input name="password" type="password" minLength="8" required />
           </label>
         )}
         <button disabled={busy}>
           {busy
+<<<<<<< HEAD
             ? "Procesando…"
             : recovery
               ? "Enviar enlace"
               : register
                 ? "Crear cuenta"
                 : "Iniciar sesión"}
+=======
+            ? t("auth.processing")
+            : recovery
+              ? t("auth.sendLink")
+              : register
+                ? t("auth.registerTitle")
+                : t("auth.login")}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
         </button>
         <button
           type="button"
@@ -278,7 +437,11 @@ function Access({ registerDefault = false }) {
             setMessage("");
           }}
         >
+<<<<<<< HEAD
           {recovery ? "Volver al acceso" : "¿Olvidaste tu contraseña?"}
+=======
+          {recovery ? t("auth.backToLogin") : t("auth.forgot")}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
         </button>
         {!recovery && (
           <button
@@ -287,16 +450,23 @@ function Access({ registerDefault = false }) {
             onClick={() => {
               setRegister(!register);
               setMessage("");
+<<<<<<< HEAD
               setCanResend(false);
             }}
           >
             {register ? "Volver a iniciar sesión" : "Crear una cuenta"}
+=======
+            }}
+          >
+            {register ? t("auth.backToLoginAction") : t("auth.createAccountLink")}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
           </button>
         )}
       </form>
     </div>
   );
 }
+<<<<<<< HEAD
 function EmailConfirmation({ session }) {
   const go = useNavigate();
   return (
@@ -324,11 +494,17 @@ function EmailConfirmation({ session }) {
     </div>
   );
 }
+=======
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
 const Page = ({ title, children }) => (
   <>
     <header className="pagehead">
       <div>
+<<<<<<< HEAD
         <p className="eyebrow">PPI · aprendizaje seguro</p>
+=======
+        <p className="eyebrow">{useLanguage().t("page.eyebrow")}</p>
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
         <h1>{title}</h1>
       </div>
     </header>
@@ -336,6 +512,7 @@ const Page = ({ title, children }) => (
   </>
 );
 function Home({ profile }) {
+<<<<<<< HEAD
   return (
     <Page title={`Hola, ${profile?.full_name || "persona protegida"}`}>
       <div className="hero">
@@ -355,6 +532,31 @@ function Home({ profile }) {
           ["24/7", "hábitos de seguridad"],
         ].map((x) => (
           <article className="stat" key={x[1]}>
+=======
+  const { t } = useLanguage();
+  return (
+    <Page
+      title={
+        profile?.full_name
+          ? t("home.greeting", { name: profile.full_name })
+          : t("home.protectedPerson")
+      }
+    >
+      <div className="hero">
+        <div>
+          <h2>{t("home.headline")}</h2>
+          <p>{t("home.intro")}</p>
+        </div>
+        <ShieldCheck size={76} aria-hidden="true" />
+      </div>
+      <section className="grid">
+        {[
+          ["12+", t("home.methods")],
+          ["8+", t("home.threats")],
+          ["24/7", t("home.habits")],
+        ].map((x) => (
+          <article className="stat" key={x[0]}>
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
             <strong>{x[0]}</strong>
             <span>{x[1]}</span>
           </article>
@@ -363,10 +565,19 @@ function Home({ profile }) {
     </Page>
   );
 }
+<<<<<<< HEAD
 function Catalogue({ table, title, kind }) {
   const [items, setItems] = useState([]),
     [query, setQuery] = useState(""),
     [error, setError] = useState("");
+=======
+function Catalogue({ table, titleKey, kindKey }) {
+  const { t, translateCatalog } = useLanguage();
+  const [items, setItems] = useState([]),
+    [query, setQuery] = useState(""),
+    [error, setError] = useState(false),
+    [loading, setLoading] = useState(true);
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
   useEffect(() => {
     supabase
       .from(table)
@@ -374,11 +585,17 @@ function Catalogue({ table, title, kind }) {
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         setItems(data || []);
+<<<<<<< HEAD
         setError(error?.message || "");
+=======
+        setError(Boolean(error));
+        setLoading(false);
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
       });
   }, [table]);
   const filtered = useMemo(
     () =>
+<<<<<<< HEAD
       items.filter((x) =>
         JSON.stringify(x).toLowerCase().includes(query.toLowerCase()),
       ),
@@ -391,10 +608,27 @@ function Catalogue({ table, title, kind }) {
         <input
           aria-label="Buscar"
           placeholder="Buscar en el catálogo…"
+=======
+      items.filter((item) =>
+        JSON.stringify(translateCatalog(table, item))
+          .toLowerCase()
+          .includes(query.toLowerCase()),
+      ),
+    [items, query, table, translateCatalog],
+  );
+  return (
+    <Page title={t(titleKey)}>
+      <div className="toolbar">
+        <Search size={18} aria-hidden="true" />
+        <input
+          aria-label={t("common.search")}
+          placeholder={t("common.searchCatalog")}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
+<<<<<<< HEAD
       {error && <Notice>{error}</Notice>}
       <div className="grid cards">
         {filtered.map((x) => (
@@ -422,10 +656,40 @@ function Catalogue({ table, title, kind }) {
             ? "No hay resultados para esa búsqueda."
             : "Aún no hay contenido publicado."}
         </div>
+=======
+      {error && <Notice>{t("common.error")}</Notice>}
+      <div className="grid cards">
+        {filtered.map((item) => {
+          const record = translateCatalog(table, item);
+          return (
+          <article className="card" key={item.id}>
+            <span className="tag">{record.risk_level || record.category || t(kindKey)}</span>
+            <h2>{record.name}</h2>
+            <p>{record.description || record.what_is}</p>
+            {record.recommendations && (
+              <>
+                <h3>{t("catalogue.recommendation")}</h3>
+                <p>{record.recommendations}</p>
+              </>
+            )}
+            {record.how_spreads && (
+              <p>
+                <b>{t("catalogue.spread")}</b> {record.how_spreads}
+              </p>
+            )}
+          </article>
+          );
+        })}
+      </div>
+      {loading && <div className="empty" role="status">{t("common.loading")}</div>}
+      {!loading && !error && !items.length && (
+        <div className="empty">{t("common.noContent")}</div>
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
       )}
     </Page>
   );
 }
+<<<<<<< HEAD
 const Avatar = ({ url, name = "U" }) => {
   const initials = name
     .split(" ")
@@ -442,12 +706,18 @@ const Avatar = ({ url, name = "U" }) => {
 function Community({ session }) {
   const [posts, setPosts] = useState([]),
     [replyCount, setReplyCount] = useState({}),
+=======
+function Community({ session }) {
+  const { language, t } = useLanguage();
+  const [topics, setTopics] = useState([]),
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
     [selected, setSelected] = useState(null),
     [title, setTitle] = useState(""),
     [body, setBody] = useState(""),
     [category, setCategory] = useState("General"),
     [reply, setReply] = useState(""),
     [replies, setReplies] = useState([]),
+<<<<<<< HEAD
     [notice, setNotice] = useState(""),
     [search, setSearch] = useState(""),
     [loading, setLoading] = useState(false),
@@ -534,6 +804,44 @@ function Community({ session }) {
         return;
       }
     }
+=======
+    [repliesLoading, setRepliesLoading] = useState(false),
+    [loading, setLoading] = useState(true),
+    [notice, setNotice] = useState("");
+  const load = () =>
+    supabase
+      .from("forum_posts")
+      .select("*,profiles(full_name)")
+      .eq("status", "approved")
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        setTopics(data || []);
+        setLoading(false);
+        if (error) setNotice("community.migrationError");
+      });
+  useEffect(() => {
+    load();
+  }, []);
+  useEffect(() => {
+    if (!selected) {
+      setReplies([]);
+      return;
+    }
+    setRepliesLoading(true);
+    supabase
+      .from("forum_replies")
+      .select("*,profiles(full_name)")
+      .eq("post_id", selected.id)
+      .eq("status", "approved")
+      .order("created_at")
+      .then(({ data }) => {
+        setReplies(data || []);
+        setRepliesLoading(false);
+      });
+  }, [selected]);
+  const create = async (e) => {
+    e.preventDefault();
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
     const { error } = await supabase
       .from("forum_posts")
       .insert({
@@ -541,6 +849,7 @@ function Community({ session }) {
         title: clean(title),
         body: clean(body),
         category,
+<<<<<<< HEAD
         status: "approved",
         image_url: imageUrl,
       });
@@ -566,12 +875,22 @@ function Community({ session }) {
         return;
       }
     }
+=======
+      });
+    setNotice(error ? "common.error" : "community.topicSent");
+    setTitle("");
+    setBody("");
+  };
+  const sendReply = async (e) => {
+    e.preventDefault();
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
     const { error } = await supabase
       .from("forum_replies")
       .insert({
         post_id: selected.id,
         author_id: session.user.id,
         body: clean(reply),
+<<<<<<< HEAD
         status: "approved",
         image_url: imageUrl,
       });
@@ -603,10 +922,24 @@ function Community({ session }) {
       ),
     [posts, search],
   );
+=======
+      });
+    setNotice(error ? "common.error" : "community.replySent");
+    setReply("");
+  };
+  const categoryValues = ["General", "Prevención", "Amenazas", "Ayuda técnica"];
+  const displayCategory = (value) => {
+    const categoryIndex = categoryValues.indexOf(value);
+    return categoryIndex === -1
+      ? value
+      : t(`community.categories.${categoryIndex}`);
+  };
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
   if (selected)
     return (
       <Page title={selected.title}>
         <button className="link" onClick={() => setSelected(null)}>
+<<<<<<< HEAD
           ← Volver
         </button>
         <article className="post-detail">
@@ -712,21 +1045,77 @@ function Community({ session }) {
           <p className="eyebrow">CREAR PUBLICACIÓN</p>
           <label>
             Título
+=======
+          {t("community.backToForum")}
+        </button>
+        <article className="forum-topic">
+          <span className="tag">{displayCategory(selected.category)}</span>
+          <p>{selected.body}</p>
+          <small>
+            {t("community.startedBy", {
+              name: selected.profiles?.full_name || t("common.member"),
+            })}
+          </small>
+        </article>
+        {repliesLoading ? (
+          <div className="empty" role="status">{t("common.loading")}</div>
+        ) : (
+          <div className="feed">
+            {replies.map((r) => (
+              <article className="comment" key={r.id}>
+                <b>{r.profiles?.full_name || t("common.member")}</b>
+                <p>{r.body}</p>
+              </article>
+            ))}
+          </div>
+        )}
+        {!selected.locked && (
+          <form className="card composer" onSubmit={sendReply}>
+            <h2>{t("community.reply")}</h2>
+            <textarea
+              aria-label={t("community.reply")}
+              required
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              maxLength="2000"
+            />
+            <button>{t("community.sendReply")}</button>
+          </form>
+        )}
+        {notice && <Notice>{t(notice)}</Notice>}
+      </Page>
+    );
+  return (
+    <Page title={t("community.title")}>
+      <div className="forum-layout">
+        <form className="card composer" onSubmit={create}>
+          <p className="eyebrow">{t("community.openTopic")}</p>
+          <label>
+            {t("community.topicTitle")}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
             <input
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               minLength="6"
               maxLength="120"
+<<<<<<< HEAD
               placeholder="¿Cuál es tu pregunta?"
             />
           </label>
           <label>
             Categoría
+=======
+            />
+          </label>
+          <label>
+            {t("community.category")}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
+<<<<<<< HEAD
               {["General", "Prevención", "Amenazas", "Ayuda técnica"].map(
                 (x) => (
                   <option key={x}>{x}</option>
@@ -828,20 +1217,70 @@ function Community({ session }) {
           )}
         </div>
       </div>
+=======
+              {categoryValues.map((value, index) => (
+                <option key={value} value={value}>
+                  {t(`community.categories.${index}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <textarea
+            aria-label={t("community.topicPlaceholder")}
+            required
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={t("community.topicPlaceholder")}
+            maxLength="4000"
+          />
+          <button>{t("community.submitTopic")}</button>
+        </form>
+        <div className="forum-stream">
+          {topics.map((topic) => (
+            <button
+              className="forum-row"
+              key={topic.id}
+              onClick={() => setSelected(topic)}
+            >
+              <span className="tag">{displayCategory(topic.category)}</span>
+              <b>{topic.title}</b>
+              <small>
+                {topic.profiles?.full_name || t("common.member")} ·{" "}
+                {new Date(topic.created_at).toLocaleDateString(
+                  language === "es" ? "es-CO" : "en-US",
+                )}
+              </small>
+            </button>
+          ))}
+          {loading && <div className="empty" role="status">{t("community.loading")}</div>}
+          {!loading && !topics.length && (
+            <div className="empty">{t("community.noTopics")}</div>
+          )}
+        </div>
+      </div>
+      {notice && <Notice>{t(notice)}</Notice>}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
     </Page>
   );
 }
 function Profile({ session, profile }) {
+<<<<<<< HEAD
   const [name, setName] = useState(profile?.full_name || ""),
     [msg, setMsg] = useState(""),
     [uploading, setUploading] = useState(false),
     [previewUrl, setPreviewUrl] = useState(profile?.avatar_url || "");
+=======
+  const { t } = useLanguage();
+  const [name, setName] = useState(profile?.full_name || ""),
+    [msg, setMsg] = useState("");
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
   const save = async (e) => {
     e.preventDefault();
     const { error } = await supabase
       .from("profiles")
       .update({ full_name: clean(name) })
       .eq("id", session.user.id);
+<<<<<<< HEAD
     setMsg(error ? error.message : "✓ Perfil actualizado");
   };
   const handleAvatarSelect = async (e) => {
@@ -922,6 +1361,15 @@ function Profile({ session, profile }) {
         </div>
         <label>
           Nombre
+=======
+    setMsg(error ? "profile.updateError" : "profile.updated");
+  };
+  return (
+    <Page title={t("profile.title")}>
+      <form className="card form" onSubmit={save}>
+        <label>
+          {t("profile.name")}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -930,26 +1378,106 @@ function Profile({ session, profile }) {
           />
         </label>
         <label>
+<<<<<<< HEAD
           Correo
           <input value={session.user.email} disabled />
         </label>
         <button>{uploading ? "Guardando…" : "Guardar cambios"}</button>
         {msg && <p>{msg}</p>}
+=======
+          {t("profile.email")}
+          <input value={session.user.email} disabled />
+        </label>
+        <button>{t("common.save")}</button>
+        {msg && <p>{t(msg)}</p>}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
       </form>
     </Page>
   );
 }
+<<<<<<< HEAD
 function AdminCollection({ table, fields, title }) {
   const [rows, setRows] = useState([]),
     [draft, setDraft] = useState({}),
     [msg, setMsg] = useState("");
+=======
+function Manuals({ profile }) {
+  const { t } = useLanguage();
+  const availableManuals = profile?.role === "admin"
+    ? [
+        {
+          file: "/manuales/manual_usuario.pdf",
+          titleKey: "manuals.userTitle",
+          descriptionKey: "manuals.userDescription",
+        },
+        {
+          file: "/manuales/manual_administrador.pdf",
+          titleKey: "manuals.adminTitle",
+          descriptionKey: "manuals.adminDescription",
+        },
+      ]
+    : profile?.role === "user"
+      ? [
+          {
+            file: "/manuales/manual_usuario.pdf",
+            titleKey: "manuals.userTitle",
+            descriptionKey: "manuals.userDescription",
+          },
+        ]
+      : [];
+
+  return (
+    <Page title={t("manuals.title")}>
+      <p className="manuals-intro">{t("manuals.subtitle")}</p>
+      {profile?.role !== "user" && profile?.role !== "admin" ? (
+        <div className="empty" role="status" aria-live="polite">
+          {t("manuals.loadingRole")}
+        </div>
+      ) : (
+        <section className="manuals-grid">
+          {availableManuals.map((manual) => {
+            const title = t(manual.titleKey);
+            return (
+              <article className="card manual-card" key={manual.file}>
+                <BookOpen size={24} aria-hidden="true" />
+                <h2>{title}</h2>
+                <p>{t(manual.descriptionKey)}</p>
+                <a
+                  className="manual-download"
+                  href={manual.file}
+                  download
+                  aria-label={t("manuals.downloadNamed", { title })}
+                >
+                  <Download size={18} aria-hidden="true" />
+                  {t("manuals.download")}
+                </a>
+              </article>
+            );
+          })}
+        </section>
+      )}
+    </Page>
+  );
+}
+function AdminCollection({ table, fields, title }) {
+  const { t, translateCatalog } = useLanguage();
+  const [rows, setRows] = useState([]),
+    [draft, setDraft] = useState({}),
+    [msg, setMsg] = useState(""),
+    [loading, setLoading] = useState(true);
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
   const load = async () => {
     const { data, error } = await supabase
       .from(table)
       .select("*")
       .order("created_at", { ascending: false });
     setRows(data || []);
+<<<<<<< HEAD
     setMsg(error?.message || "");
+=======
+    if (error) setMsg("common.error");
+    setLoading(false);
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
   };
   useEffect(() => {
     load();
@@ -960,25 +1488,43 @@ function AdminCollection({ table, fields, title }) {
     const { error } = draft.id
       ? await supabase.from(table).update(payload).eq("id", draft.id)
       : await supabase.from(table).insert(payload);
+<<<<<<< HEAD
     setMsg(error ? error.message : "Cambio guardado.");
+=======
+    setMsg(error ? "common.error" : "admin.edited");
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
     setDraft({});
     load();
   };
   const remove = async (id) => {
+<<<<<<< HEAD
     if (!confirm("¿Eliminar este registro?")) return;
     const { error } = await supabase.from(table).delete().eq("id", id);
     setMsg(error ? error.message : "Registro eliminado.");
+=======
+    if (!window.confirm(t("admin.confirmDelete"))) return;
+    const { error } = await supabase.from(table).delete().eq("id", id);
+    setMsg(error ? "common.error" : "admin.deleted");
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
     load();
   };
   return (
     <section className="admin-split">
       <form className="card form" onSubmit={save}>
         <h2>
+<<<<<<< HEAD
           {draft.id ? "Editar" : "Nuevo"} {title}
         </h2>
         {fields.map((f) => (
           <label key={f}>
             {f.replaceAll("_", " ")}
+=======
+          {draft.id ? t("common.edit") : t("admin.new")} {t(title)}
+        </h2>
+        {fields.map((f) => (
+          <label key={f}>
+            {t(`admin.fields.${f}`)}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
             <textarea
               required
               value={draft[f] || ""}
@@ -986,6 +1532,7 @@ function AdminCollection({ table, fields, title }) {
             />
           </label>
         ))}
+<<<<<<< HEAD
         <button>{draft.id ? "Actualizar" : "Crear"}</button>
         {draft.id && (
           <button type="button" className="link" onClick={() => setDraft({})}>
@@ -1005,10 +1552,39 @@ function AdminCollection({ table, fields, title }) {
             </button>
           </article>
         ))}
+=======
+        <button>{draft.id ? t("common.update") : t("common.create")}</button>
+        {draft.id && (
+          <button type="button" className="link" onClick={() => setDraft({})}>
+            {t("admin.cancelEdit")}
+          </button>
+        )}
+        {msg && <p>{t(msg)}</p>}
+      </form>
+      <div className="admin-list">
+        {loading && <div className="empty" role="status">{t("common.loading")}</div>}
+        {rows.map((sourceRow) => {
+          const row = translateCatalog(table, sourceRow);
+          return (
+            <article className="comment" key={row.id}>
+              <b>{row.name}</b>
+              <p>{row.description || row.what_is}</p>
+              <button onClick={() => setDraft(sourceRow)}>{t("common.edit")}</button>
+              <button className="danger" onClick={() => remove(row.id)}>
+                {t("common.delete")}
+              </button>
+            </article>
+          );
+        })}
+        {!loading && !rows.length && (
+          <div className="empty">{t("common.noContent")}</div>
+        )}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
       </div>
     </section>
   );
 }
+<<<<<<< HEAD
 function Moderation({ table = "comments", label = "comentarios" }) {
   const [rows, setRows] = useState([]),
     [error, setError] = useState("");
@@ -1076,10 +1652,57 @@ function Moderation({ table = "comments", label = "comentarios" }) {
       {!error && !rows.length && (
         <div className="empty">Sin {label} pendientes.</div>
       )}
+=======
+function Moderation() {
+  const { t } = useLanguage();
+  const [rows, setRows] = useState([]),
+    [loading, setLoading] = useState(true),
+    [message, setMessage] = useState("");
+  const load = () =>
+    supabase
+      .from("comments")
+      .select("*,profiles(full_name)")
+      .eq("status", "pending")
+      .order("created_at")
+      .then(({ data, error }) => {
+        setRows(data || []);
+        setLoading(false);
+        if (error) setMessage("common.error");
+      });
+  useEffect(() => {
+    load();
+  }, []);
+  const act = async (id, status) => {
+    const { error } = await supabase
+      .from("comments")
+      .update({ status })
+      .eq("id", id);
+    setMessage(error ? "common.error" : `admin.${status}`);
+    load();
+  };
+  return (
+    <section className="feed">
+      {rows.map((r) => (
+        <article className="comment" key={r.id}>
+          <b>{r.profiles?.full_name || t("common.user")}</b>
+          <p>{r.body}</p>
+          <button onClick={() => act(r.id, "approved")}>{t("admin.approve")}</button>
+          <button className="danger" onClick={() => act(r.id, "rejected")}>
+            {t("admin.reject")}
+          </button>
+        </article>
+      ))}
+      {loading && <div className="empty" role="status">{t("common.loading")}</div>}
+      {!loading && !rows.length && (
+        <div className="empty">{t("admin.noPending")}</div>
+      )}
+      {message && <Notice>{t(message)}</Notice>}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
     </section>
   );
 }
 function Admin() {
+<<<<<<< HEAD
   const [view, setView] = useState("methods");
   return (
     <Page title="Centro de control">
@@ -1090,20 +1713,39 @@ function Admin() {
           ["comments", "Comentarios"],
           ["posts", "Temas del foro"],
           ["replies", "Respuestas"],
+=======
+  const { t } = useLanguage();
+  const [view, setView] = useState("methods");
+  return (
+    <Page title={t("admin.title")}>
+      <div className="admin-tabs">
+        {[
+          ["methods", "admin.methods"],
+          ["threats", "admin.threats"],
+          ["comments", "admin.moderation"],
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
         ].map(([id, label]) => (
           <button
             key={id}
             className={view === id ? "active" : ""}
             onClick={() => setView(id)}
           >
+<<<<<<< HEAD
             {label}
+=======
+            {t(label)}
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
           </button>
         ))}
       </div>
       {view === "methods" && (
         <AdminCollection
           table="prevention_methods"
+<<<<<<< HEAD
           title="método"
+=======
+          title="admin.method"
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
           fields={[
             "name",
             "description",
@@ -1117,33 +1759,49 @@ function Admin() {
       {view === "threats" && (
         <AdminCollection
           table="threats"
+<<<<<<< HEAD
           title="amenaza"
+=======
+          title="admin.threat"
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
           fields={["name", "category", "what_is", "how_spreads", "prevention"]}
         />
       )}{" "}
       {view === "comments" && <Moderation />}
+<<<<<<< HEAD
       {view === "posts" && (
         <Moderation table="forum_posts" label="temas del foro" />
       )}
       {view === "replies" && (
         <Moderation table="forum_replies" label="respuestas" />
       )}
+=======
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
     </Page>
   );
 }
 export default function App() {
   return (
+<<<<<<< HEAD
     <BrowserRouter basename="/PPI">
       <AuthProvider>
+=======
+    <LanguageProvider>
+      <BrowserRouter>
+        <AuthProvider>
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
         {({ session, profile }) => (
           <Routes>
             <Route path="/acceso" element={<Access />} />
             <Route path="/registro" element={<Access registerDefault />} />
             <Route
+<<<<<<< HEAD
               path="/confirmacion"
               element={<EmailConfirmation session={session} />}
             />
             <Route
+=======
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
               path="/inicio"
               element={
                 <Protected session={session} profile={profile}>
@@ -1157,8 +1815,13 @@ export default function App() {
                 <Protected session={session} profile={profile}>
                   <Catalogue
                     table="prevention_methods"
+<<<<<<< HEAD
                     title="Métodos de prevención"
                     kind="Método"
+=======
+                    titleKey="catalogue.methodTitle"
+                    kindKey="catalogue.method"
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
                   />
                 </Protected>
               }
@@ -1169,8 +1832,13 @@ export default function App() {
                 <Protected session={session} profile={profile}>
                   <Catalogue
                     table="threats"
+<<<<<<< HEAD
                     title="Amenazas informáticas"
                     kind="Amenaza"
+=======
+                    titleKey="catalogue.threatTitle"
+                    kindKey="catalogue.threat"
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
                   />
                 </Protected>
               }
@@ -1192,6 +1860,17 @@ export default function App() {
               }
             />
             <Route
+<<<<<<< HEAD
+=======
+              path="/manuales"
+              element={
+                <Protected session={session} profile={profile}>
+                  <Manuals profile={profile} />
+                </Protected>
+              }
+            />
+            <Route
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
               path="/admin"
               element={
                 <Protected session={session} profile={profile} admin>
@@ -1205,7 +1884,13 @@ export default function App() {
             />
           </Routes>
         )}
+<<<<<<< HEAD
       </AuthProvider>
     </BrowserRouter>
+=======
+        </AuthProvider>
+      </BrowserRouter>
+    </LanguageProvider>
+>>>>>>> ceebf19 (feat: add bilingual UI and role-based manuals)
   );
 }

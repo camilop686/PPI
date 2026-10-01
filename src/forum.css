@@ -1,0 +1,132 @@
+.forum-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.82fr) minmax(0, 1.18fr);
+  align-items: start;
+  gap: 22px;
+}
+
+.forum-layout > .composer {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.forum-layout .composer .eyebrow {
+  margin: 0 0 2px;
+}
+
+.forum-layout .composer label {
+  margin: 0;
+}
+
+.forum-layout .composer select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #b9cabd;
+  border-radius: 5px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.forum-layout .composer textarea {
+  min-height: 128px;
+  resize: vertical;
+}
+
+.forum-layout .composer button {
+  width: 100%;
+}
+
+.forum-stream {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  align-content: start;
+}
+
+.forum-row {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 9px;
+  padding: 15px 17px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--signal);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  font-weight: 500;
+  transition: border-color 0.16s ease, background-color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.forum-row:hover {
+  border-color: #9ab99e;
+  border-left-color: #39722b;
+  background: #f7fbf7;
+  filter: none;
+  transform: translateX(2px);
+}
+
+.forum-row .tag {
+  justify-self: start;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.forum-row b {
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.forum-row small {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.forum-topic {
+  max-width: 850px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--signal);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.forum-topic p {
+  margin: 16px 0;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.forum-topic small {
+  color: var(--muted);
+}
+
+.forum-topic + .feed {
+  max-width: 850px;
+  margin-top: 16px;
+}
+
+@media (max-width: 860px) {
+  .forum-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+}
+
+@media (max-width: 540px) {
+  .forum-layout > .composer,
+  .forum-topic {
+    padding: 17px;
+  }
+
+  .forum-row {
+    padding: 14px;
+  }
+}
